@@ -1,0 +1,880 @@
+======================================================================
+  V19 BS32模式: batch=32 | turbo=True
+  epochs=300 display=20 lr=0.003
+======================================================================
+
+[输入] BS32: 单字符直接编码 (1字→128D)...
+  字符: 58个 | 句子: 8对
+  数据: 8对 | 训练:6 测试:0 考试:2
+  展示: 6→7字 | A=['今', '天', '天', '气', '很', '好'] | B=['天', '气', '今', '天', '很', '不', '错']
+
+[TURBO] P3属性预缓存到GPU...
+  预缓存: 52字 × 128D = 26.0KB GPU | 0s
+
+[模型] BS32: CharEmbed→P7→P3→P3-L→ABC→Gate→P6
+  CharEmbed:14,848 | P7:449,939 | P6:8,585,728 | 总:11,106,679
+  总参数: 11,106,679 | batch_size=32
+
+[校验] 架构维度一致性...
+  [OK] 全部通过
+
+[冷启动] 未找到V20权重
+
+[冷启动] 未找到V21权重, 全新训练
+
+======================================================================
+  BS32训练 300轮 (batch=32)
+======================================================================
+
+[视觉] 图文对: 0 (apple→苹果, sun→太阳)
+[WIRE] 组件已接入: κ调度/结晶/覆盖熵/Betti/曲率/动量池/探针/因果/SSOL/MI
+  [WIRE] step=0 phase=explore temp=0.9993055555555556 curv=(0.0, 0.0) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=0 probe_gain=(0.0018445145105943084, 0.0007785010384395719) cryst_regions=0 kappa={'mean': 1.9996192455291748, 'std': 0.005472396034747362, 'min': 1.985912561416626, 'max': 2.0136351585388184, 'saturated': 0}
+E    1/300 | loss=5.6831 | ok=2/7 | P3L_max=0.0072 | 2s
+  CE=4.075 A=2.996 B=4.71e-04 C=3.26e-03 gate=0.146 | ema=7.61 aux_s=1.00 ↓
+  gate占比: base=99% abc=0% sent=1% | ac_raw=0.01
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也的天很水美
+  正确: 天气今天很不错
+======================================================================
+E    2/300 | loss=5.0425 | ok=2/7 | P3L_max=0.0405 | 0s
+  CE=3.720 A=2.874 B=4.28e-04 C=2.61e-03 gate=0.145 | ema=7.22 aux_s=1.00 ↓
+  gate占比: base=98% abc=0% sent=2% | ac_raw=0.18
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也的天很很美
+  正确: 天气今天很不错
+======================================================================
+E    3/300 | loss=4.4411 | ok=1/7 | P3L_max=0.2893 | 0s
+  CE=3.361 A=2.437 B=2.84e-04 C=8.74e-03 gate=0.144 | ema=6.83 aux_s=1.00 ↓
+  gate占比: base=98% abc=1% sent=1% | ac_raw=0.65
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0003 param=9.4 ratio=0.000037
+  grad:p7=0.3016 param=233.1 ratio=0.001294
+  grad:p6=1.2773 param=336.6 ratio=0.003795
+  grad:p3l=0.0028 param=497.3 ratio=0.000006
+  grad:abcA=1.7071 param=32.4 ratio=0.052753
+  grad:abcB=0.0252 param=26.0 ratio=0.000968
+  grad:abcC=0.0876 param=16.4 ratio=0.005357
+  grad:explore=0.0002 param=44.5 ratio=0.000004
+  grad:meta=0.0052 param=34.2 ratio=0.000151
+  grad:abc_to_gate=0.0000 param=0.8 ratio=0.000001
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=9.5 ratio=0.000002
+  grad:p7=0.1762 param=233.1 ratio=0.000756
+  grad:p6=0.2846 param=358.2 ratio=0.000795
+  grad:p3l=0.0004 param=497.6 ratio=0.000001
+  grad:abcA=0.0022 param=34.9 ratio=0.000062
+  grad:abcB=0.0176 param=28.3 ratio=0.000623
+  grad:abcC=0.0116 param=18.0 ratio=0.000646
+  grad:explore=0.0001 param=63.1 ratio=0.000001
+  grad:meta=0.0036 param=34.6 ratio=0.000105
+  grad:abc_to_gate=0.0000 param=1.3 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=9.5 ratio=0.000001
+  grad:p7=0.1433 param=233.1 ratio=0.000615
+  grad:p6=0.5218 param=370.9 ratio=0.001407
+  grad:p3l=0.0023 param=499.1 ratio=0.000005
+  grad:abcA=0.0050 param=35.5 ratio=0.000140
+  grad:abcB=0.0877 param=31.9 ratio=0.002748
+  grad:abcC=0.0126 param=19.8 ratio=0.000636
+  grad:explore=0.0001 param=74.3 ratio=0.000001
+  grad:meta=0.0029 param=34.7 ratio=0.000084
+  grad:abc_to_gate=0.0000 param=1.8 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=9.6 ratio=0.000001
+  grad:p7=0.1264 param=233.1 ratio=0.000542
+  grad:p6=0.2434 param=378.5 ratio=0.000643
+  grad:p3l=0.0042 param=500.5 ratio=0.000008
+  grad:abcA=0.0025 param=36.3 ratio=0.000069
+  grad:abcB=0.0316 param=34.8 ratio=0.000909
+  grad:abcC=0.0080 param=21.2 ratio=0.000378
+  grad:explore=0.0000 param=81.8 ratio=0.000000
+  grad:meta=0.0006 param=35.0 ratio=0.000018
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+E   20/300 | loss=1.7000 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=1.662 A=0.000 B=7.01e-04 C=2.94e-03 gate=0.124 | ema=2.62 aux_s=1.00 ↓
+  gate占比: base=91% abc=8% sent=1% | ac_raw=2.29
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也的天空升美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=9.6 ratio=0.000001
+  grad:p7=0.1224 param=233.1 ratio=0.000525
+  grad:p6=0.1171 param=383.4 ratio=0.000306
+  grad:p3l=0.0012 param=501.9 ratio=0.000002
+  grad:abcA=0.0017 param=36.9 ratio=0.000045
+  grad:abcB=0.0266 param=36.8 ratio=0.000721
+  grad:abcC=0.0040 param=22.3 ratio=0.000180
+  grad:explore=0.0000 param=86.7 ratio=0.000000
+  grad:meta=0.0002 param=35.1 ratio=0.000007
+  grad:abc_to_gate=0.0000 param=2.2 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=9.7 ratio=0.000001
+  grad:p7=0.1165 param=233.2 ratio=0.000500
+  grad:p6=0.1163 param=386.5 ratio=0.000301
+  grad:p3l=0.0036 param=502.9 ratio=0.000007
+  grad:abcA=0.0007 param=37.3 ratio=0.000020
+  grad:abcB=0.0079 param=38.2 ratio=0.000206
+  grad:abcC=0.0036 param=23.0 ratio=0.000154
+  grad:explore=0.0000 param=90.1 ratio=0.000000
+  grad:meta=0.0002 param=35.2 ratio=0.000006
+  grad:abc_to_gate=0.0000 param=2.2 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=9.7 ratio=0.000001
+  grad:p7=0.1106 param=233.2 ratio=0.000474
+  grad:p6=0.0982 param=388.6 ratio=0.000253
+  grad:p3l=0.0255 param=503.5 ratio=0.000051
+  grad:abcA=0.0048 param=37.6 ratio=0.000128
+  grad:abcB=0.0330 param=39.1 ratio=0.000844
+  grad:abcC=0.0070 param=23.5 ratio=0.000297
+  grad:explore=0.0000 param=92.5 ratio=0.000000
+  grad:meta=0.0002 param=35.3 ratio=0.000006
+  grad:abc_to_gate=0.0000 param=2.3 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=9.8 ratio=0.000001
+  grad:p7=0.1084 param=233.2 ratio=0.000465
+  grad:p6=0.0745 param=389.9 ratio=0.000191
+  grad:p3l=0.0226 param=504.1 ratio=0.000045
+  grad:abcA=0.0175 param=37.8 ratio=0.000464
+  grad:abcB=0.0822 param=39.7 ratio=0.002071
+  grad:abcC=0.0268 param=23.8 ratio=0.001126
+  grad:explore=0.0000 param=94.2 ratio=0.000000
+  grad:meta=0.0001 param=35.3 ratio=0.000004
+  grad:abc_to_gate=0.0000 param=2.3 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+E   40/300 | loss=1.6741 | ok=3/7 | P3L_max=1.0000 | 0s
+  CE=1.651 A=0.000 B=4.26e-04 C=3.69e-03 gate=0.094 | ema=1.77 aux_s=1.00 ↓
+  gate占比: base=89% abc=10% sent=1% | ac_raw=2.12
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我气的天很很乐
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=9.9 ratio=0.000001
+  grad:p7=0.1046 param=233.3 ratio=0.000448
+  grad:p6=0.0492 param=390.8 ratio=0.000126
+  grad:p3l=0.0018 param=504.4 ratio=0.000003
+  grad:abcA=0.0023 param=37.9 ratio=0.000060
+  grad:abcB=0.0200 param=40.0 ratio=0.000499
+  grad:abcC=0.0078 param=24.0 ratio=0.000326
+  grad:explore=0.0000 param=95.6 ratio=0.000000
+  grad:meta=0.0001 param=35.3 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.3 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=10.0 ratio=0.000001
+  grad:p7=0.1010 param=233.3 ratio=0.000433
+  grad:p6=0.0385 param=391.4 ratio=0.000098
+  grad:p3l=0.0123 param=504.9 ratio=0.000024
+  grad:abcA=0.0215 param=38.0 ratio=0.000568
+  grad:abcB=0.0883 param=40.3 ratio=0.002193
+  grad:abcC=0.0229 param=24.2 ratio=0.000946
+  grad:explore=0.0000 param=96.7 ratio=0.000000
+  grad:meta=0.0001 param=35.3 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.3 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  [WIRE] step=300 phase=explore temp=0.9645833333333333 curv=(0.07188109308481216, 0.6183333333333333) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=254 probe_gain=(0.001998689491301775, 0.0005120213609188795) cryst_regions=0 kappa={'mean': 1.9856805801391602, 'std': 0.08090881258249283, 'min': 1.7739180326461792, 'max': 2.2479684352874756, 'saturated': 0}
+  grad:p7_in=0.0000 param=10.1 ratio=0.000001
+  grad:p7=0.0958 param=233.3 ratio=0.000410
+  grad:p6=0.0339 param=391.8 ratio=0.000086
+  grad:p3l=0.0014 param=505.2 ratio=0.000003
+  grad:abcA=0.0054 param=38.0 ratio=0.000142
+  grad:abcB=0.0293 param=40.5 ratio=0.000723
+  grad:abcC=0.0099 param=24.4 ratio=0.000405
+  grad:explore=0.0000 param=97.7 ratio=0.000000
+  grad:meta=0.0000 param=35.3 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=10.4 ratio=0.000001
+  grad:p7=0.0881 param=233.4 ratio=0.000378
+  grad:p6=0.0286 param=392.0 ratio=0.000073
+  grad:p3l=0.0049 param=505.5 ratio=0.000010
+  grad:abcA=0.0022 param=38.0 ratio=0.000059
+  grad:abcB=0.0122 param=40.7 ratio=0.000301
+  grad:abcC=0.0049 param=24.5 ratio=0.000202
+  grad:explore=0.0000 param=98.5 ratio=0.000000
+  grad:meta=0.0001 param=35.3 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+E   60/300 | loss=1.6603 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=1.650 A=0.000 B=2.50e-04 C=4.66e-04 gate=0.054 | ema=1.66 aux_s=1.00 ↓
+  gate占比: base=88% abc=11% sent=1% | ac_raw=2.13
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也的天吃快乐
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=10.7 ratio=0.000001
+  grad:p7=0.0789 param=233.4 ratio=0.000338
+  grad:p6=0.0250 param=392.2 ratio=0.000064
+  grad:p3l=0.0296 param=505.9 ratio=0.000058
+  grad:abcA=0.0129 param=38.0 ratio=0.000340
+  grad:abcB=0.0556 param=40.8 ratio=0.001362
+  grad:abcC=0.0094 param=24.7 ratio=0.000383
+  grad:explore=0.0000 param=99.3 ratio=0.000000
+  grad:meta=0.0000 param=35.2 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=11.1 ratio=0.000002
+  grad:p7=0.0711 param=233.5 ratio=0.000304
+  grad:p6=0.0202 param=392.4 ratio=0.000051
+  grad:p3l=0.0020 param=506.3 ratio=0.000004
+  grad:abcA=0.0084 param=38.0 ratio=0.000220
+  grad:abcB=0.0310 param=40.9 ratio=0.000757
+  grad:abcC=0.0064 param=24.8 ratio=0.000259
+  grad:explore=0.0000 param=100.0 ratio=0.000000
+  grad:meta=0.0000 param=35.2 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=11.7 ratio=0.000003
+  grad:p7=0.0683 param=233.5 ratio=0.000293
+  grad:p6=0.0152 param=392.5 ratio=0.000039
+  grad:p3l=0.0086 param=506.6 ratio=0.000017
+  grad:abcA=0.0194 param=38.0 ratio=0.000511
+  grad:abcB=0.0586 param=41.0 ratio=0.001428
+  grad:abcC=0.0087 param=24.9 ratio=0.000349
+  grad:explore=0.0000 param=100.7 ratio=0.000000
+  grad:meta=0.0000 param=35.2 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0000 param=12.7 ratio=0.000004
+  grad:p7=0.0674 param=233.5 ratio=0.000289
+  grad:p6=0.0148 param=392.6 ratio=0.000038
+  grad:p3l=0.0029 param=507.0 ratio=0.000006
+  grad:abcA=0.0083 param=38.0 ratio=0.000219
+  grad:abcB=0.0234 param=41.1 ratio=0.000568
+  grad:abcC=0.0037 param=25.0 ratio=0.000149
+  grad:explore=0.0000 param=101.3 ratio=0.000000
+  grad:meta=0.0001 param=35.2 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+E   80/300 | loss=1.6525 | ok=2/7 | P3L_max=1.0000 | 0s
+  CE=1.649 A=0.000 B=1.24e-04 C=3.07e-04 gate=0.018 | ema=1.65 aux_s=1.00 ↓
+  gate占比: base=88% abc=11% sent=1% | ac_raw=2.12
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我让的天空不乐
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0001 param=14.0 ratio=0.000006
+  grad:p7=0.0805 param=233.6 ratio=0.000345
+  grad:p6=0.0310 param=392.7 ratio=0.000079
+  grad:p3l=0.0003 param=507.3 ratio=0.000001
+  grad:abcA=0.0004 param=38.0 ratio=0.000010
+  grad:abcB=0.0014 param=41.3 ratio=0.000035
+  grad:abcC=0.0006 param=25.1 ratio=0.000024
+  grad:explore=0.0000 param=101.9 ratio=0.000000
+  grad:meta=0.0003 param=35.2 ratio=0.000009
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0003 param=16.0 ratio=0.000017
+  grad:p7=0.0540 param=233.6 ratio=0.000231
+  grad:p6=0.0328 param=392.8 ratio=0.000084
+  grad:p3l=0.0003 param=507.6 ratio=0.000001
+  grad:abcA=0.0003 param=38.0 ratio=0.000009
+  grad:abcB=0.0022 param=41.3 ratio=0.000054
+  grad:abcC=0.0010 param=25.2 ratio=0.000041
+  grad:explore=0.0000 param=102.4 ratio=0.000000
+  grad:meta=0.0004 param=35.2 ratio=0.000011
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0011 param=18.8 ratio=0.000059
+  grad:p7=0.2613 param=233.7 ratio=0.001118
+  grad:p6=0.0926 param=393.4 ratio=0.000235
+  grad:p3l=0.0001 param=507.9 ratio=0.000000
+  grad:abcA=0.0002 param=38.0 ratio=0.000005
+  grad:abcB=0.0015 param=41.4 ratio=0.000037
+  grad:abcC=0.0007 param=25.2 ratio=0.000029
+  grad:explore=0.0000 param=102.9 ratio=0.000000
+  grad:meta=0.0017 param=35.2 ratio=0.000050
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0072 param=21.9 ratio=0.000327
+  grad:p7=2.0176 param=233.8 ratio=0.008629
+  grad:p6=1.1921 param=395.4 ratio=0.003015
+  grad:p3l=0.0001 param=508.0 ratio=0.000000
+  grad:abcA=0.0001 param=38.0 ratio=0.000002
+  grad:abcB=0.0010 param=41.4 ratio=0.000025
+  grad:abcC=0.0003 param=25.2 ratio=0.000011
+  grad:explore=0.0003 param=103.5 ratio=0.000002
+  grad:meta=0.0209 param=35.1 ratio=0.000596
+  grad:abc_to_gate=0.0000 param=2.6 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+E  100/300 | loss=1.4554 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=1.454 A=0.000 B=1.10e-04 C=2.51e-06 gate=0.010 | ema=1.60 aux_s=1.00 ↓
+  gate占比: base=85% abc=14% sent=1% | ac_raw=2.12
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我让我天到快乐
+  正确: 天气今天很不错
+======================================================================
+  [WIRE] step=600 phase=explore temp=0.9298611111111111 curv=(0.41111987829208374, 0.5349999999999999) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=416 probe_gain=(0.001990143908187747, 0.00027920296997763216) cryst_regions=0 kappa={'mean': 1.9880638122558594, 'std': 0.09023264795541763, 'min': 1.7697880268096924, 'max': 2.2395715713500977, 'saturated': 0}
+  grad:p7_in=0.0738 param=23.6 ratio=0.003130
+  grad:p7=3.9276 param=234.0 ratio=0.016785
+  grad:p6=0.5781 param=399.5 ratio=0.001447
+  grad:p3l=0.0007 param=508.1 ratio=0.000001
+  grad:abcA=0.0005 param=38.0 ratio=0.000014
+  grad:abcB=0.0022 param=41.4 ratio=0.000052
+  grad:abcC=0.0004 param=25.2 ratio=0.000015
+  grad:explore=0.0001 param=104.5 ratio=0.000001
+  grad:meta=0.0081 param=35.3 ratio=0.000229
+  grad:abc_to_gate=0.0000 param=3.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.1628 param=24.3 ratio=0.006697
+  grad:p7=6.9740 param=234.2 ratio=0.029784
+  grad:p6=1.5000 param=405.3 ratio=0.003701
+  grad:p3l=0.0005 param=508.2 ratio=0.000001
+  grad:abcA=0.0004 param=38.0 ratio=0.000010
+  grad:abcB=0.0029 param=41.4 ratio=0.000070
+  grad:abcC=0.0002 param=25.3 ratio=0.000008
+  grad:explore=0.0003 param=105.4 ratio=0.000003
+  grad:meta=0.0278 param=35.6 ratio=0.000781
+  grad:abc_to_gate=0.0000 param=3.0 ratio=0.000001
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0494 param=24.9 ratio=0.001986
+  grad:p7=2.7620 param=234.2 ratio=0.011795
+  grad:p6=0.7624 param=411.0 ratio=0.001855
+  grad:p3l=0.0001 param=508.3 ratio=0.000000
+  grad:abcA=0.0001 param=38.0 ratio=0.000004
+  grad:abcB=0.0007 param=41.4 ratio=0.000018
+  grad:abcC=0.0002 param=25.3 ratio=0.000009
+  grad:explore=0.0001 param=106.5 ratio=0.000001
+  grad:meta=0.0087 param=36.1 ratio=0.000241
+  grad:abc_to_gate=0.0000 param=2.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.2818 param=25.4 ratio=0.011076
+  grad:p7=19.3359 param=234.2 ratio=0.082565
+  grad:p6=1.6098 param=416.5 ratio=0.003865
+  grad:p3l=0.0003 param=508.3 ratio=0.000001
+  grad:abcA=0.0003 param=38.0 ratio=0.000007
+  grad:abcB=0.0013 param=41.4 ratio=0.000032
+  grad:abcC=0.0003 param=25.3 ratio=0.000012
+  grad:explore=0.0002 param=107.6 ratio=0.000002
+  grad:meta=0.0254 param=36.7 ratio=0.000691
+  grad:abc_to_gate=0.0000 param=2.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+E  120/300 | loss=0.3746 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.373 A=0.000 B=1.02e-04 C=3.08e-06 gate=0.010 | ema=0.75 aux_s=1.00 ↓
+  gate占比: base=85% abc=9% sent=6% | ac_raw=2.12
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0586 param=26.1 ratio=0.002247
+  grad:p7=2.5359 param=234.3 ratio=0.010826
+  grad:p6=0.3928 param=421.4 ratio=0.000932
+  grad:p3l=0.0002 param=508.4 ratio=0.000000
+  grad:abcA=0.0002 param=38.0 ratio=0.000005
+  grad:abcB=0.0008 param=41.4 ratio=0.000018
+  grad:abcC=0.0005 param=25.3 ratio=0.000018
+  grad:explore=0.0000 param=108.6 ratio=0.000000
+  grad:meta=0.0026 param=37.1 ratio=0.000071
+  grad:abc_to_gate=0.0000 param=2.2 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.1026 param=26.6 ratio=0.003860
+  grad:p7=6.7024 param=234.3 ratio=0.028609
+  grad:p6=0.6436 param=425.6 ratio=0.001512
+  grad:p3l=0.0002 param=508.4 ratio=0.000000
+  grad:abcA=0.0002 param=38.0 ratio=0.000006
+  grad:abcB=0.0012 param=41.4 ratio=0.000028
+  grad:abcC=0.0004 param=25.3 ratio=0.000014
+  grad:explore=0.0002 param=109.7 ratio=0.000002
+  grad:meta=0.0140 param=37.3 ratio=0.000375
+  grad:abc_to_gate=0.0000 param=2.1 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0114 param=27.0 ratio=0.000421
+  grad:p7=1.2292 param=234.3 ratio=0.005246
+  grad:p6=0.1037 param=429.3 ratio=0.000242
+  grad:p3l=0.0002 param=508.5 ratio=0.000000
+  grad:abcA=0.0001 param=38.0 ratio=0.000004
+  grad:abcB=0.0011 param=41.5 ratio=0.000027
+  grad:abcC=0.0003 param=25.3 ratio=0.000012
+  grad:explore=0.0000 param=110.8 ratio=0.000000
+  grad:meta=0.0008 param=37.7 ratio=0.000021
+  grad:abc_to_gate=0.0000 param=2.1 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0051 param=27.3 ratio=0.000186
+  grad:p7=0.4986 param=234.3 ratio=0.002128
+  grad:p6=0.0550 param=432.1 ratio=0.000127
+  grad:p3l=0.0000 param=508.5 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000001
+  grad:abcB=0.0013 param=41.5 ratio=0.000031
+  grad:abcC=0.0003 param=25.3 ratio=0.000011
+  grad:explore=0.0000 param=111.9 ratio=0.000000
+  grad:meta=0.0004 param=38.1 ratio=0.000011
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+E  140/300 | loss=0.0087 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.007 A=0.000 B=9.28e-05 C=1.60e-06 gate=0.010 | ema=0.13 aux_s=1.00 [OK]
+  gate占比: base=88% abc=5% sent=7% | ac_raw=2.12
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0066 param=27.5 ratio=0.000239
+  grad:p7=0.6141 param=234.3 ratio=0.002621
+  grad:p6=0.0735 param=434.1 ratio=0.000169
+  grad:p3l=0.0001 param=508.6 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000001
+  grad:abcB=0.0003 param=41.5 ratio=0.000008
+  grad:abcC=0.0002 param=25.3 ratio=0.000008
+  grad:explore=0.0000 param=112.9 ratio=0.000000
+  grad:meta=0.0019 param=38.3 ratio=0.000049
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0029 param=27.6 ratio=0.000105
+  grad:p7=0.3063 param=234.3 ratio=0.001307
+  grad:p6=0.0336 param=435.4 ratio=0.000077
+  grad:p3l=0.0001 param=508.7 ratio=0.000000
+  grad:abcA=0.0001 param=38.0 ratio=0.000003
+  grad:abcB=0.0005 param=41.5 ratio=0.000013
+  grad:abcC=0.0002 param=25.3 ratio=0.000009
+  grad:explore=0.0000 param=113.8 ratio=0.000000
+  grad:meta=0.0012 param=38.5 ratio=0.000031
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  [WIRE] step=900 phase=explore temp=0.8951388888888889 curv=(0.35806912183761597, 0.45166666666666666) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=669 probe_gain=(0.0020099743269383907, 0.0003543162310961634) cryst_regions=0 kappa={'mean': 1.9911816120147705, 'std': 0.18095187842845917, 'min': 1.424501657485962, 'max': 2.5785489082336426, 'saturated': 0}
+  grad:p7_in=0.0017 param=27.7 ratio=0.000062
+  grad:p7=0.1377 param=234.3 ratio=0.000587
+  grad:p6=0.0134 param=436.3 ratio=0.000031
+  grad:p3l=0.0000 param=508.8 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000001
+  grad:abcB=0.0003 param=41.5 ratio=0.000007
+  grad:abcC=0.0001 param=25.3 ratio=0.000003
+  grad:explore=0.0000 param=114.5 ratio=0.000000
+  grad:meta=0.0004 param=38.7 ratio=0.000012
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0011 param=27.7 ratio=0.000038
+  grad:p7=0.1231 param=234.3 ratio=0.000525
+  grad:p6=0.0106 param=437.0 ratio=0.000024
+  grad:p3l=0.0001 param=508.8 ratio=0.000000
+  grad:abcA=0.0001 param=38.0 ratio=0.000002
+  grad:abcB=0.0004 param=41.5 ratio=0.000010
+  grad:abcC=0.0002 param=25.3 ratio=0.000006
+  grad:explore=0.0000 param=115.3 ratio=0.000000
+  grad:meta=0.0002 param=38.8 ratio=0.000005
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+E  160/300 | loss=0.0031 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.002 A=0.000 B=7.69e-05 C=1.03e-06 gate=0.010 | ema=0.02 aux_s=1.00 [OK]
+  gate占比: base=87% abc=5% sent=8% | ac_raw=2.11
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0006 param=27.8 ratio=0.000020
+  grad:p7=0.0610 param=234.3 ratio=0.000260
+  grad:p6=0.0081 param=437.5 ratio=0.000018
+  grad:p3l=0.0000 param=508.8 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0005 param=41.5 ratio=0.000011
+  grad:abcC=0.0001 param=25.3 ratio=0.000003
+  grad:explore=0.0000 param=116.1 ratio=0.000000
+  grad:meta=0.0001 param=38.9 ratio=0.000004
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0004 param=27.8 ratio=0.000014
+  grad:p7=0.0297 param=234.3 ratio=0.000127
+  grad:p6=0.0062 param=437.8 ratio=0.000014
+  grad:p3l=0.0000 param=508.8 ratio=0.000000
+  grad:abcA=0.0001 param=38.0 ratio=0.000002
+  grad:abcB=0.0003 param=41.5 ratio=0.000008
+  grad:abcC=0.0001 param=25.3 ratio=0.000003
+  grad:explore=0.0000 param=116.9 ratio=0.000000
+  grad:meta=0.0001 param=39.0 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0005 param=27.8 ratio=0.000019
+  grad:p7=0.0450 param=234.3 ratio=0.000192
+  grad:p6=0.0056 param=438.1 ratio=0.000013
+  grad:p3l=0.0000 param=508.8 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000001
+  grad:abcB=0.0002 param=41.5 ratio=0.000006
+  grad:abcC=0.0000 param=25.3 ratio=0.000002
+  grad:explore=0.0000 param=117.7 ratio=0.000000
+  grad:meta=0.0001 param=39.1 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0002 param=27.8 ratio=0.000006
+  grad:p7=0.0104 param=234.3 ratio=0.000045
+  grad:p6=0.0037 param=438.2 ratio=0.000008
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0003 param=41.5 ratio=0.000006
+  grad:abcC=0.0000 param=25.3 ratio=0.000002
+  grad:explore=0.0000 param=118.5 ratio=0.000000
+  grad:meta=0.0001 param=39.1 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+E  180/300 | loss=0.0023 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.001 A=0.000 B=6.62e-05 C=3.62e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.11
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0002 param=27.8 ratio=0.000009
+  grad:p7=0.0239 param=234.3 ratio=0.000102
+  grad:p6=0.0032 param=438.4 ratio=0.000007
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000001
+  grad:abcB=0.0002 param=41.5 ratio=0.000005
+  grad:abcC=0.0000 param=25.3 ratio=0.000002
+  grad:explore=0.0000 param=119.3 ratio=0.000000
+  grad:meta=0.0001 param=39.1 ratio=0.000003
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0001 param=27.8 ratio=0.000003
+  grad:p7=0.0071 param=234.3 ratio=0.000031
+  grad:p6=0.0027 param=438.5 ratio=0.000006
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000001
+  grad:abcB=0.0002 param=41.5 ratio=0.000005
+  grad:abcC=0.0000 param=25.3 ratio=0.000002
+  grad:explore=0.0000 param=120.1 ratio=0.000000
+  grad:meta=0.0001 param=39.2 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0001 param=27.8 ratio=0.000005
+  grad:p7=0.0153 param=234.3 ratio=0.000065
+  grad:p6=0.0026 param=438.6 ratio=0.000006
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0002 param=41.5 ratio=0.000004
+  grad:abcC=0.0000 param=25.3 ratio=0.000001
+  grad:explore=0.0000 param=120.9 ratio=0.000000
+  grad:meta=0.0001 param=39.2 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+  grad:p7_in=0.0001 param=27.8 ratio=0.000003
+  grad:p7=0.0073 param=234.3 ratio=0.000031
+  grad:p6=0.0021 param=438.7 ratio=0.000005
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0002 param=41.5 ratio=0.000004
+  grad:abcC=0.0000 param=25.3 ratio=0.000001
+  grad:explore=0.0000 param=121.6 ratio=0.000000
+  grad:meta=0.0001 param=39.3 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.6 ratio=0.000000
+E  200/300 | loss=0.0021 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.001 A=0.000 B=5.50e-05 C=4.38e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.10
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  [WIRE] step=1200 phase=explore temp=0.8604166666666666 curv=(0.055682867765426636, 0.36833333333333335) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=831 probe_gain=(0.0019959404598921537, 0.00022061221534386277) cryst_regions=0 kappa={'mean': 2.010962963104248, 'std': 0.21471551060676575, 'min': 1.371214747428894, 'max': 3.004202127456665, 'saturated': 0}
+  grad:p7_in=0.0001 param=27.8 ratio=0.000003
+  grad:p7=0.0083 param=234.3 ratio=0.000035
+  grad:p6=0.0020 param=438.8 ratio=0.000005
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000004
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=122.3 ratio=0.000000
+  grad:meta=0.0001 param=39.3 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0001 param=27.8 ratio=0.000002
+  grad:p7=0.0056 param=234.3 ratio=0.000024
+  grad:p6=0.0019 param=438.9 ratio=0.000004
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000004
+  grad:abcC=0.0000 param=25.3 ratio=0.000001
+  grad:explore=0.0000 param=123.0 ratio=0.000000
+  grad:meta=0.0001 param=39.3 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0001 param=27.8 ratio=0.000002
+  grad:p7=0.0058 param=234.3 ratio=0.000025
+  grad:p6=0.0019 param=439.0 ratio=0.000004
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.3 ratio=0.000001
+  grad:explore=0.0000 param=123.7 ratio=0.000000
+  grad:meta=0.0001 param=39.4 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0035 param=234.3 ratio=0.000015
+  grad:p6=0.0018 param=439.1 ratio=0.000004
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=124.3 ratio=0.000000
+  grad:meta=0.0001 param=39.4 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+E  220/300 | loss=0.0019 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=4.29e-05 C=5.87e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.10
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0034 param=234.4 ratio=0.000015
+  grad:p6=0.0017 param=439.1 ratio=0.000004
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=124.8 ratio=0.000000
+  grad:meta=0.0001 param=39.4 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0034 param=234.4 ratio=0.000015
+  grad:p6=0.0016 param=439.2 ratio=0.000004
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=125.4 ratio=0.000000
+  grad:meta=0.0001 param=39.5 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0035 param=234.4 ratio=0.000015
+  grad:p6=0.0016 param=439.3 ratio=0.000004
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=125.8 ratio=0.000000
+  grad:meta=0.0000 param=39.5 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0032 param=234.4 ratio=0.000014
+  grad:p6=0.0015 param=439.3 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.6 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=126.2 ratio=0.000000
+  grad:meta=0.0000 param=39.5 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+E  240/300 | loss=0.0018 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=3.29e-05 C=6.42e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.11
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0032 param=234.4 ratio=0.000014
+  grad:p6=0.0014 param=439.4 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=126.6 ratio=0.000000
+  grad:meta=0.0000 param=39.6 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0032 param=234.4 ratio=0.000014
+  grad:p6=0.0014 param=439.5 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=126.9 ratio=0.000000
+  grad:meta=0.0000 param=39.6 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  [WIRE] step=1500 phase=explore temp=0.8256944444444445 curv=(0.14062444865703583, 0.28500000000000003) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=955 probe_gain=(0.0019982776138931513, 0.00018568833183962852) cryst_regions=0 kappa={'mean': 2.019817352294922, 'std': 0.2386113852262497, 'min': 1.371941089630127, 'max': 3.640533447265625, 'saturated': 0}
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0031 param=234.4 ratio=0.000013
+  grad:p6=0.0013 param=439.5 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=127.3 ratio=0.000000
+  grad:meta=0.0000 param=39.6 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0030 param=234.4 ratio=0.000013
+  grad:p6=0.0013 param=439.6 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=127.6 ratio=0.000000
+  grad:meta=0.0000 param=39.6 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+E  260/300 | loss=0.0017 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=2.72e-05 C=5.10e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.11
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0031 param=234.4 ratio=0.000013
+  grad:p6=0.0012 param=439.7 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=128.0 ratio=0.000000
+  grad:meta=0.0000 param=39.7 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0029 param=234.4 ratio=0.000013
+  grad:p6=0.0012 param=439.7 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=128.3 ratio=0.000000
+  grad:meta=0.0000 param=39.7 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0028 param=234.4 ratio=0.000012
+  grad:p6=0.0012 param=439.8 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=128.6 ratio=0.000000
+  grad:meta=0.0000 param=39.7 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0027 param=234.4 ratio=0.000011
+  grad:p6=0.0011 param=439.9 ratio=0.000003
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=129.0 ratio=0.000000
+  grad:meta=0.0000 param=39.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+E  280/300 | loss=0.0017 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=2.33e-05 C=3.48e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.11
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0027 param=234.4 ratio=0.000012
+  grad:p6=0.0011 param=439.9 ratio=0.000002
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=129.3 ratio=0.000000
+  grad:meta=0.0000 param=39.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0027 param=234.4 ratio=0.000011
+  grad:p6=0.0011 param=440.0 ratio=0.000002
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000002
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=129.6 ratio=0.000000
+  grad:meta=0.0000 param=39.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0025 param=234.4 ratio=0.000011
+  grad:p6=0.0010 param=440.0 ratio=0.000002
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000001
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=129.9 ratio=0.000000
+  grad:meta=0.0000 param=39.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=27.8 ratio=0.000001
+  grad:p7=0.0024 param=234.4 ratio=0.000010
+  grad:p6=0.0010 param=440.1 ratio=0.000002
+  grad:p3l=0.0000 param=508.9 ratio=0.000000
+  grad:abcA=0.0000 param=38.0 ratio=0.000000
+  grad:abcB=0.0001 param=41.7 ratio=0.000001
+  grad:abcC=0.0000 param=25.3 ratio=0.000000
+  grad:explore=0.0000 param=130.3 ratio=0.000000
+  grad:meta=0.0000 param=39.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=2.0 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+E  300/300 | loss=0.0016 | ok=1/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=2.02e-05 C=2.57e-07 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=86% abc=5% sent=9% | ac_raw=2.11
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 金色的天空很美
+  正确: 天气今天很不错
+======================================================================
+
+[声学训练] 模拟FFT→文 (低/中/高音) × 30轮 (FFT球面 + 余弦对比)
+  声学E5 loss=9.8807
+  声学E10 loss=1.5209
+  声学E15 loss=1.3588
+  声学E20 loss=1.3261
+  声学E25 loss=1.2673
+  声学E30 loss=1.3277
+  声(低音) → 预测: 高音
+  声(中音) → 预测: 高音
+  声(高音) → 预测: 高音
+
+[保存] /root/rc/v22run/v22_stage1/P1_char_word/checkpoints/V19_BS32.pt
+
+[属性关联度] 训练集首对详情:
+  A句: 今天天气很好
+  B句: 天气今天很不错
+  ┌─ ABC输出 ───────────────────────
+  │ StageA 结构logits(前5): [-9.414990425109863, -9.533052444458008, -9.980238914489746, -9.671455383300781, -9.200721740722656]
+  │ StageA 预测类: 6 / 15
+  │ StageB 内容: mean=-0.007 std=2.027 (前5)=[1.7046359777450562, -0.11487604677677155, -2.43941593170166, 3.168700933456421, -0.3902234137058258]
+  │ StageC 语气: mean=-0.923 std=7.404 (前5)=[18.088176727294922, 7.877999305725098, 0.9652323126792908, -0.07596058398485184, -0.28519919514656067]
+  └──────────────────────────────────
+  ┌─ P3属性(前8字) ─────────────────
+  │ [今天] type=noun_time sem=未知 syn=宾语 person=none emot=neutral
+  │ [天] type=noun sem=未知 syn=宾语 person=none emot=neutral
+  │ [气] type=content_word sem=未知 syn=宾语 person=none emot=neutral
+  │ [很] type=content_word sem=未知 syn=宾语 person=none emot=positive
+  │ [好] type=adjective sem=状态 syn=宾语 person=none emot=positive
+  └──────────────────────────────────
+  ┌─ P3-L 属性关联 (312头前5组) ────
+  │ person(600000值): mean=0.002 max=1.000
+  │ syntax(600000值): mean=0.002 max=1.000
+  │ semantic(500000值): mean=0.002 max=1.000
+  │ sem_entity(400000值): mean=0.002 max=1.000
+  │ sem_abstract(300000值): mean=0.002 max=1.000
+  └──────────────────────────────────
+  ┌─ Gate状态 ───────────────────────
+  │ explore: signal_mean=5.551
+  │ meta: bias_mean=0.215 bias_std=0.259
+  │ Master: temps=[[0.13176874816417694, 0.4311842620372772, 0.4751836061477661, 0.48499566316604614, 0.5002091526985168]]
+  └──────────────────────────────────
+
+[训练记忆验证]...
+Traceback (most recent call last):
+  File "/root/rc/v22run/v22_stage1/train_v22_stage1.py", line 1310, in <module>
+    a_log_v, ah_v = abcA(attr_a.squeeze(0), wo[:,:attr_a.shape[1],:])
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/rc/v22run/v22_stage1/train_v22_stage1.py", line 291, in forward
+    x = torch.cat([attr_vec, word_out], dim=-1)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Tensors must have same number of dimensions: got 2 and 3

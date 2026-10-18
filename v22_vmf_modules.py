@@ -135,7 +135,7 @@ class KappaPhaseScheduler:
             return max(0.1, 1.0 - 0.5 * self.current_step / self.explore_steps)
         else:
             progress = (self.current_step - self.explore_steps) / self.crystallize_steps
-            return 0.5 * (1.0 - progress)
+            return max(0.1, min(1.0, 0.5 * (1.0 - progress)))   # [修正] clamp 防 progress>1 时负温度
 
 
 class CompetitiveCrystallization:
@@ -209,11 +209,8 @@ class LocalBettiMonitor:
             curr_neighbors = set(indices[1:].tolist())  # 排除自己
             prev = self.prev_neighbors[i]
 
-            # Detect collapse: nearest neighbor suddenly far away
-            nearest_dist = dists[i][indices[1]].item() if len(indices) > 1 else float('inf')
-            if prev and nearest_dist > 1.0:
-                # Head has gone far from all other heads = collapse signal
-                self.collapse_warnings += 1
+            if prev and len(curr_neighbors) == 0:
+                self.collapse_warnings += 1  # β₀ 1→0: 恶性崩溃
             elif prev and len(prev & curr_neighbors) < len(prev) * 0.3:
                 self.reorg_events += 1      # 近邻大轮换: 良性重组
             self.prev_neighbors[i] = curr_neighbors
@@ -334,7 +331,7 @@ class LocalCurvatureEstimator:
 
     def step_threshold(self, total_steps, current_step, initial=0.7, final=0.2):
         """自适应阈值退火"""
-        self.threshold = initial - (initial - final) * current_step / total_steps
+        self.threshold = initial  # 注意: 后面按步数退火, 调用方需保证 current_step<=total_steps - (initial - final) * current_step / total_steps
 
 
 # ═══════════════════════════════════════════════════════════
@@ -355,6 +352,7 @@ class AdaptiveProbeSet:
         self.probes = nn.Parameter(F.normalize(probes, dim=-1))
         self.info_gains = torch.zeros(n_probes)
         self.step_count = 0
+        self.refine_every = 1000
 
     def compute_info_gain(self, head_activations):
         """每个探针的信息增益 = 附近微头激活方差"""
@@ -369,7 +367,7 @@ class AdaptiveProbeSet:
     def refine(self, head_activations):
         """自适应加密: 每1000步重分布"""
         self.step_count += 1
-        if self.step_count % 1000 != 0:
+        if self.step_count % max(1, getattr(self, "refine_every", 1000)) != 0:
             return
         gains = self.compute_info_gain(head_activations)
         # 找最高/最低G的探针

@@ -1,0 +1,44 @@
+diff --git "a/D:\\ai\\\347\273\217\351\252\214\345\272\223_\350\256\255\347\273\203\344\276\247\350\241\245\345\205\205\\xuanyiyan.18\\v22_vmf_modules.py" "b/D:\\ai\\V22.1_\344\272\221\347\253\257\350\220\275\345\234\260_20261018\\\350\277\234\347\253\257\345\216\237\346\240\267\\v22_vmf_modules_patched.py"
+index 1ed6668..5317a60 100644
+--- "a/D:\\ai\\\347\273\217\351\252\214\345\272\223_\350\256\255\347\273\203\344\276\247\350\241\245\345\205\205\\xuanyiyan.18\\v22_vmf_modules.py"
++++ "b/D:\\ai\\V22.1_\344\272\221\347\253\257\350\220\275\345\234\260_20261018\\\350\277\234\347\253\257\345\216\237\346\240\267\\v22_vmf_modules_patched.py"
+@@ -135,7 +135,7 @@ class KappaPhaseScheduler:
+             return max(0.1, 1.0 - 0.5 * self.current_step / self.explore_steps)
+         else:
+             progress = (self.current_step - self.explore_steps) / self.crystallize_steps
+-            return 0.5 * (1.0 - progress)
++            return max(0.1, min(1.0, 0.5 * (1.0 - progress)))   # [修正] clamp 防 progress>1 时负温度
+ 
+ 
+ class CompetitiveCrystallization:
+@@ -327,11 +327,11 @@ class LocalCurvatureEstimator:
+         short_cv = s.std() / (s.mean() + 1e-8)
+         long_cv = l.std() / (l.mean() + 1e-8)
+         curvature = float(short_cv / (long_cv + 1e-8))  # >1 = 短期曲率增大
+-        return curvature.item(), self.threshold
++        return curvature, self.threshold
+ 
+     def step_threshold(self, total_steps, current_step, initial=0.7, final=0.2):
+         """自适应阈值退火"""
+-        self.threshold = initial - (initial - final) * current_step / total_steps
++        self.threshold = initial  # 注意: 后面按步数退火, 调用方需保证 current_step<=total_steps - (initial - final) * current_step / total_steps
+ 
+ 
+ # ═══════════════════════════════════════════════════════════
+@@ -352,6 +352,7 @@ class AdaptiveProbeSet:
+         self.probes = nn.Parameter(F.normalize(probes, dim=-1))
+         self.info_gains = torch.zeros(n_probes)
+         self.step_count = 0
++        self.refine_every = 1000
+ 
+     def compute_info_gain(self, head_activations):
+         """每个探针的信息增益 = 附近微头激活方差"""
+@@ -366,7 +367,7 @@ class AdaptiveProbeSet:
+     def refine(self, head_activations):
+         """自适应加密: 每1000步重分布"""
+         self.step_count += 1
+-        if self.step_count % 1000 != 0:
++        if self.step_count % max(1, getattr(self, "refine_every", 1000)) != 0:
+             return
+         gains = self.compute_info_gain(head_activations)
+         # 找最高/最低G的探针

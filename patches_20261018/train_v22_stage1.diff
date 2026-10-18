@@ -1,0 +1,151 @@
+diff --git "a/D:\\ai\\\347\273\217\351\252\214\345\272\223_\350\256\255\347\273\203\344\276\247\350\241\245\345\205\205\\xuanyiyan.18\\train_v22_stage1.py" "b/D:\\ai\\V22.1_\344\272\221\347\253\257\350\220\275\345\234\260_20261018\\\350\277\234\347\253\257\345\216\237\346\240\267\\train_v22_stage1_patched.py"
+index 90b27d4..88a3a98 100644
+--- "a/D:\\ai\\\347\273\217\351\252\214\345\272\223_\350\256\255\347\273\203\344\276\247\350\241\245\345\205\205\\xuanyiyan.18\\train_v22_stage1.py"
++++ "b/D:\\ai\\V22.1_\344\272\221\347\253\257\350\220\275\345\234\260_20261018\\\350\277\234\347\253\257\345\216\237\346\240\267\\train_v22_stage1_patched.py"
+@@ -40,6 +40,10 @@ class P6_Tied(nn.Module):
+         return logits
+ from P3_word_attr.stack import P3AttributeStack
+ from P3_word_attr.p3l_linkage import P3L_AttributeLinkage
++from v22_vmf_modules import (TurboMeta_vMF, MasterGate_vMF, P7Gate_vMF,
++    SphericalSelfOrganizingLoss, MutualInformationPenalty,
++    KappaPhaseScheduler, MomentumExchangePool, PCACurvatureProxy,
++    LocalCurvatureEstimator, LocalBettiMonitor, SphericalVoronoiProbe)
+ 
+ parser = argparse.ArgumentParser()
+ parser.add_argument("--epochs", type=int, default=1000)
+@@ -55,6 +59,13 @@ parser.add_argument("--adaptive_interval", type=int, default=5, help="自适应
+ parser.add_argument("--quick_test", action="store_true", help="快速测试GPU占比, 几批就停")
+ args = parser.parse_args()
+ 
++SEED = int(os.environ.get("SEED", "42"))
++torch.manual_seed(SEED); random.seed(SEED)
++try:
++    import numpy as _np; _np.random.seed(SEED)
++except Exception: pass
++print(f"[SEED] {SEED}", flush=True)
++
+ BATCH_SIZE = args.batch_size
+ 
+ # 自适应GPU负载检测
+@@ -268,6 +279,13 @@ class MasterGate(MasterGate_vMF):
+     pass
+ 
+ master_gate = MasterGate().to(DEVICE)
++
++# [修正] 评测/展示/考试路径必须走训练同款 sv_rich（abc_prime + 记忆 me 注入）
++def _sv_rich_from(sv, ct, p3lf):
++    rd = abcD(ct)[1]
++    me = abcE(rd, sv)
++    return sv + abc_to_sent(abc_prime(p3lf)) * 0.1 + me_to_sent(me) * 0.1
++
+ opt_master = torch.optim.Adam(master_gate.parameters(), lr=args.lr * 0.5)
+ 
+ # torch.compile: Windows无triton, 跳过
+@@ -851,6 +869,19 @@ def audio_step():
+     cos_loss = (1 - F.cosine_similarity(a_emb_b, torch.stack(t_embs), dim=-1)).mean()  # 声↔文 余弦
+     return ce + cos_loss
+ 
++
++# ===== V22.1 组件接线（v22_wire）=====
++from v22_wire import V22Wire
++if os.environ.get("WIRE_DISABLE", "0") == "1":
++    from v22_wire import _NullWire
++    wire = _NullWire()
++    w("[WIRE] WIRE_DISABLE=1: 空接线（clean control）")
++else:
++    wire = V22Wire(explore=explore, meta=meta, master=master_gate,
++               reg_weight=float(os.environ.get('WIRE_REG','0.005')), probe_every=50, causal_every=250,
++                   total_steps=max(int(args.epochs*max(1, len(train_set)) / max(1, args.batch_size)), 200))  # [修正] 真实 step 数
++w("[WIRE] 组件已接入: κ调度/结晶/覆盖熵/Betti/曲率/动量池/探针/因果/SSOL/MI")
++
+ for ep in range(1, args.epochs+1):
+     t0 = time.time(); total_loss, n = 0.0, 0
+     total_ce, total_A, total_B, total_C, total_gate = 0.0, 0.0, 0.0, 0.0, 0.0
+@@ -1012,7 +1043,8 @@ for ep in range(1, args.epochs+1):
+         loss_D_c = F.cross_entropy(rel_logits, rel_tgt)
+         gate_loss = (wg_batch.std() * 10).clamp(0.01, 1.0) if wg_batch.numel() > 1 else torch.tensor(0.1, device=DEVICE)
+         sub_losses = torch.stack([gate_loss.detach(), loss_A_c.detach(), loss_B_c.detach(), loss_C_c.detach(), ce_loss.detach()])
+-        temps = master_gate(sub_losses)
++        _t = master_gate(sub_losses.unsqueeze(0))   # [适配] vMF 版 forward 含 batch 维，未批输入需 unsqueeze
++        temps = _t.squeeze(0) if _t.dim() == 2 else _t
+         # 单次CE尖峰检测: 超EMA的3倍或绝对值>5 → 触发冷却
+         ce_now = ce_loss.item()
+         ce_spike = (ce_now > max(p7.ce_ema * 3.0, 5.0))
+@@ -1024,6 +1056,13 @@ for ep in range(1, args.epochs+1):
+         p7.ce_std = 0.95 * p7.ce_std + 0.05 * abs(ce_loss.item() - p7.ce_ema)
+         p7.prev_ce = ce_loss.item()
+         batch_loss = ce_loss + aux_scale*(temps[1]*loss_A_c + temps[2]*loss_B_c + temps[3]*loss_C_c + 0.01*loss_D_c) + temps[0]*gate_loss  # V22: loss_D冷启动固定0.01, 不进master动态防震荡
++        try:
++            _hv = wire.head_vectors()
++            _reg = wire.regularizer(_hv)
++            if _reg is not None:
++                batch_loss = batch_loss + wire.reg_weight * _reg
++        except Exception:
++            pass
+ 
+         # 自学习率: 每批更新 (暂时关闭, 用固定lr)
+         # for slr in slrs: slr.step_lr(batch_loss.item())
+@@ -1070,6 +1109,11 @@ for ep in range(1, args.epochs+1):
+             for o in opts: o.zero_grad()
+         else:
+             for o in opts: o.step()
++            try:
++                _gn = sum((p.grad.norm().item() for p in explore.parameters() if p.grad is not None), 0.0)
++                wire.post_step((ep-1)*max(1,len(train_set))+n, gates, float(batch_loss.item()), _gn, opts)
++            except Exception:
++                pass
+ 
+         del wo_batch, sv_batch, wg_batch, Av_emb, pred_all, a_logits, ah, ct, ac_batch, attr_b
+         import gc; gc.collect()
+@@ -1087,7 +1131,7 @@ for ep in range(1, args.epochs+1):
+             gpu_str = ''
+             elapsed_ep = time.time()-t0
+             eta_ep = elapsed_ep / max(pct, 1) * (100 - pct)
+-            w(f"  E{ep} [{pct:.0f}%] batch={current_bs} {gpu_str} loss={batch_loss.item():.4f} | {elapsed_ep:.0f}s ETA{eta_ep:.0f}s")
++            w(f"  E{ep} [{pct:.0f}%] batch={current_bs} {gpu_str} loss={batch_loss.item():.4f} acc_same={cos_val:.3f}({ok_count}/{total_pos}) | {elapsed_ep:.0f}s ETA{eta_ep:.0f}s")
+ 
+     elapsed = time.time()-t0; avg_loss = total_loss/max(n,1)
+ 
+@@ -1135,10 +1179,16 @@ for ep in range(1, args.epochs+1):
+             a_prob_d = a_log.softmax(-1)
+             abc_conf_d = torch.stack([a_prob_d.max(-1).values.mean(),-(a_prob_d*torch.log(a_prob_d+1e-8)).sum(-1).mean(),a_log.argmax(-1).float().mean(),ac.norm(dim=-1).mean(),ac.std(dim=-1).mean(),ac.max(dim=-1).values.mean(),ct.norm(dim=-1).mean(),ct.std(dim=-1).mean(),ac[:,:5].norm(dim=-1).mean(),ac[:,5:15].norm(dim=-1).mean(),ac[:,15:].norm(dim=-1).mean(),ac.norm(dim=-1).mean()]).unsqueeze(0)
+             gate = meta(explore(torch.cat([gate_base_proj(abc_conf_d), abc_to_gate(ac), sent_to_gate(sv)], dim=-1)))
+-            logits = p6(sv, char_embed.weight, gate=gate)[:, :len(B_w), :]
++            logits = p6(_sv_rich_from(sv, ct, p3l_f), char_embed.weight, gate=gate)[:, :len(B_w), :]  # [修正] 与训练同款 sv_rich
+             pred_ids = logits[0].argmax(dim=-1).tolist()
+             pred = [i2c.get(i, '?') for i in pred_ids]
+             ok = sum(1 for p,t in zip(pred, B_w) if p==t)
++            try:
++                _bt = torch.tensor([c2i.get(c, 0) for c in B_w], device=logits.device)
++                _ce_d = F.cross_entropy(logits[0], _bt, ignore_index=0)
++                w(f"    同前向: CE={_ce_d.item():.4f} acc={ok}/{len(B_w)}")  # [仪器] 同一 logits 的 CE 与逐位 acc
++            except Exception as _e:
++                w(f"    同前向 CE 计算失败: {_e}")
+ 
+         ttl = time.time()-total_t0; eta = ttl/ep*(args.epochs-ep) if ep>0 else 0
+         gpu_u = get_gpu_util()
+@@ -1282,7 +1332,7 @@ if exam_set:
+             p3lf_v = torch.cat(feats_v) if feats_v else torch.zeros(60,device=DEVICE)
+         else: p3lf_v = torch.zeros(60,device=DEVICE)
+         p3lf_v = F.pad(p3lf_v,(0,max(0,128-p3lf_v.shape[0])))[:128].unsqueeze(0)
+-        a_log_v, ah_v = abcA(attr_a.squeeze(0), wo[:,:attr_a.shape[1],:])
++        a_log_v, ah_v = abcA(attr_a, wo[:,:attr_a.shape[1],:])  # [修正] attr_a 已是 2D, 去掉 squeeze
+         ct_v = abcB(ah_v, attr_a, p3lf_v)
+         ac_v = abcC(ct_v, attr_a)
+         a_prob_v = a_log_v.softmax(-1)
+@@ -1314,13 +1364,13 @@ if exam_set:
+                 p3lf_e = torch.cat(feats) if feats else torch.zeros(60,device=DEVICE)
+             else: p3lf_e = torch.zeros(60,device=DEVICE)
+             p3lf_e = F.pad(p3lf_e,(0,max(0,128-p3lf_e.shape[0])))[:128].unsqueeze(0)
+-            a_log_e, ah_e = abcA(attr_a.squeeze(0), wo[:,:attr_a.shape[1],:])
++            a_log_e, ah_e = abcA(attr_a, wo[:,:attr_a.shape[1],:])
+             ct_e = abcB(ah_e, attr_a, p3lf_e)
+             ac_e = abcC(ct_e, attr_a)
+             a_prob_e = a_log_e.softmax(-1)
+             abc_conf_e = torch.stack([a_prob_e.max(-1).values.mean(),-(a_prob_e*torch.log(a_prob_e+1e-8)).sum(-1).mean(),a_log_e.argmax(-1).float().mean(),ac_e.norm(dim=-1).mean(),ac_e.std(dim=-1).mean(),ac_e.max(dim=-1).values.mean(),ct_e.norm(dim=-1).mean(),ct_e.std(dim=-1).mean(),ac_e[:,:5].norm(dim=-1).mean(),ac_e[:,5:15].norm(dim=-1).mean(),ac_e[:,15:].norm(dim=-1).mean(),ac_e.norm(dim=-1).mean()]).unsqueeze(0)
+             gate_e = meta(explore(torch.cat([gate_base_proj(abc_conf_e), abc_to_gate(ac_e), sent_to_gate(sv)], dim=-1)))
+-            logits = p6(sv, char_embed.weight, gate=gate_e)[:,:len(B),:]
++            logits = p6(_sv_rich_from(sv, ct_e, p3lf_e), char_embed.weight, gate=gate_e)[:,:len(B),:]  # [修正] 与训练同款 sv_rich
+             preds = logits[0].argmax(-1).tolist()
+             tok += sum(1 for i,p in enumerate(preds) if i2c.get(p,'?')==B[i]); tn += len(B)
+     w(f"  考试集: {float(tok)/float(tn)*100:.1f}% ({int(tok)}/{int(tn)}) | {time.time()-t0:.0f}s")

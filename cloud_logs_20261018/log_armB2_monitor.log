@@ -1,0 +1,790 @@
+======================================================================
+  V19 BS32模式: batch=32 | turbo=True
+  epochs=300 display=100 lr=0.003
+======================================================================
+
+[输入] BS32: 单字符直接编码 (1字→128D)...
+  字符: 58个 | 句子: 8对
+  数据: 8对 | 训练:6 测试:0 考试:2
+  展示: 6→7字 | A=['我', '喜', '欢', '吃', '苹', '果'] | B=['我', '也', '喜', '欢', '吃', '水', '果']
+
+[TURBO] P3属性预缓存到GPU...
+  预缓存: 52字 × 128D = 26.0KB GPU | 0s
+
+[模型] BS32: CharEmbed→P7→P3→P3-L→ABC→Gate→P6
+  CharEmbed:14,848 | P7:449,939 | P6:8,585,728 | 总:11,106,679
+  总参数: 11,106,679 | batch_size=32
+
+[校验] 架构维度一致性...
+  [OK] 全部通过
+
+[冷启动] 未找到V20权重
+
+[冷启动] 未找到V21权重, 全新训练
+
+======================================================================
+  BS32训练 300轮 (batch=32)
+======================================================================
+
+[视觉] 图文对: 0 (apple→苹果, sun→太阳)
+[WIRE] 组件已接入: κ调度/结晶/覆盖熵/Betti/曲率/动量池/探针/因果/SSOL/MI
+  [WIRE] step=0 phase=explore temp=0.99375 curv=(0.0, 0.0) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=0 probe_gain=(0.0018186793895438313, 0.0019420025637373328) cryst_regions=0 kappa={'mean': 2.000246047973633, 'std': 0.005655625835061073, 'min': 1.9860658645629883, 'max': 2.0136022567749023, 'saturated': 0}
+E    1/300 | loss=6.3484 | ok=2/7 | P3L_max=0.0058 | 2s
+  CE=4.076 A=2.996 B=3.73e-04 C=2.49e-03 gate=0.155 | ema=7.61 aux_s=1.00 ↓
+  gate占比: base=99% abc=0% sent=1% | ac_raw=0.01
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也今天到很错
+  正确: 我也喜欢吃水果
+======================================================================
+E    2/300 | loss=4.9510 | ok=2/7 | P3L_max=0.0140 | 0s
+  CE=3.727 A=2.888 B=3.16e-04 C=1.99e-03 gate=0.153 | ema=7.22 aux_s=1.00 ↓
+  gate占比: base=98% abc=0% sent=2% | ac_raw=0.18
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也今天到很错
+  正确: 我也喜欢吃水果
+======================================================================
+E    3/300 | loss=4.3044 | ok=2/7 | P3L_max=0.0935 | 0s
+  CE=3.373 A=2.486 B=1.86e-04 C=2.60e-03 gate=0.152 | ema=6.83 aux_s=1.00 ↓
+  gate占比: base=98% abc=1% sent=2% | ac_raw=0.34
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 我也今天到很错
+  正确: 我也喜欢吃水果
+======================================================================
+  grad:p7_in=0.0002 param=9.4 ratio=0.000026
+  grad:p7=0.3199 param=232.9 ratio=0.001373
+  grad:p6=1.2737 param=336.6 ratio=0.003784
+  grad:p3l=0.0036 param=497.6 ratio=0.000007
+  grad:abcA=1.3259 param=32.4 ratio=0.040940
+  grad:abcB=0.0777 param=25.4 ratio=0.003062
+  grad:abcC=0.1552 param=16.4 ratio=0.009454
+  grad:explore=0.0002 param=43.1 ratio=0.000004
+  grad:meta=0.0051 param=34.3 ratio=0.000149
+  grad:abc_to_gate=0.0000 param=0.9 ratio=0.000001
+  grad:sent_to_gate=0.0000 param=5.5 ratio=0.000000
+  grad:p7_in=0.0001 param=9.8 ratio=0.000007
+  grad:p7=0.2742 param=232.9 ratio=0.001177
+  grad:p6=1.8130 param=357.7 ratio=0.005068
+  grad:p3l=0.0002 param=497.9 ratio=0.000000
+  grad:abcA=0.0092 param=42.5 ratio=0.000217
+  grad:abcB=0.1406 param=28.1 ratio=0.005006
+  grad:abcC=0.0175 param=17.8 ratio=0.000987
+  grad:explore=0.0003 param=60.9 ratio=0.000006
+  grad:meta=0.0186 param=35.1 ratio=0.000531
+  grad:abc_to_gate=0.0000 param=1.1 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.7 ratio=0.000000
+  grad:p7_in=0.0000 param=10.0 ratio=0.000003
+  grad:p7=0.2277 param=232.9 ratio=0.000977
+  grad:p6=0.3233 param=367.6 ratio=0.000880
+  grad:p3l=0.0056 param=498.1 ratio=0.000011
+  grad:abcA=0.0344 param=45.8 ratio=0.000751
+  grad:abcB=0.4624 param=31.3 ratio=0.014780
+  grad:abcC=0.0170 param=19.2 ratio=0.000882
+  grad:explore=0.0000 param=72.6 ratio=0.000000
+  grad:meta=0.0009 param=35.4 ratio=0.000025
+  grad:abc_to_gate=0.0000 param=1.4 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=5.9 ratio=0.000000
+  grad:p7_in=0.0001 param=10.3 ratio=0.000005
+  grad:p7=0.2183 param=233.0 ratio=0.000937
+  grad:p6=0.1937 param=373.7 ratio=0.000518
+  grad:p3l=0.0026 param=497.9 ratio=0.000005
+  grad:abcA=0.0450 param=44.7 ratio=0.001008
+  grad:abcB=0.9977 param=34.2 ratio=0.029180
+  grad:abcC=0.0103 param=20.5 ratio=0.000501
+  grad:explore=0.0000 param=80.6 ratio=0.000000
+  grad:meta=0.0004 param=35.5 ratio=0.000010
+  grad:abc_to_gate=0.0000 param=1.5 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.0 ratio=0.000000
+  grad:p7_in=0.0000 param=10.7 ratio=0.000004
+  grad:p7=0.2081 param=233.0 ratio=0.000893
+  grad:p6=0.1293 param=378.3 ratio=0.000342
+  grad:p3l=0.0012 param=498.3 ratio=0.000003
+  grad:abcA=0.0148 param=44.8 ratio=0.000332
+  grad:abcB=0.5236 param=36.5 ratio=0.014354
+  grad:abcC=0.0036 param=21.5 ratio=0.000170
+  grad:explore=0.0000 param=85.9 ratio=0.000000
+  grad:meta=0.0005 param=35.6 ratio=0.000015
+  grad:abc_to_gate=0.0000 param=1.6 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.1 ratio=0.000000
+  grad:p7_in=0.0000 param=11.4 ratio=0.000004
+  grad:p7=0.1989 param=233.0 ratio=0.000854
+  grad:p6=0.1329 param=381.3 ratio=0.000349
+  grad:p3l=0.0049 param=498.8 ratio=0.000010
+  grad:abcA=0.0110 param=45.5 ratio=0.000241
+  grad:abcB=0.3985 param=38.1 ratio=0.010467
+  grad:abcC=0.0023 param=22.1 ratio=0.000105
+  grad:explore=0.0000 param=89.3 ratio=0.000000
+  grad:meta=0.0005 param=35.6 ratio=0.000013
+  grad:abc_to_gate=0.0000 param=1.6 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.1 ratio=0.000000
+  grad:p7_in=0.0000 param=12.3 ratio=0.000004
+  grad:p7=0.1969 param=233.0 ratio=0.000845
+  grad:p6=0.1134 param=383.3 ratio=0.000296
+  grad:p3l=0.0050 param=499.1 ratio=0.000010
+  grad:abcA=0.0044 param=46.5 ratio=0.000095
+  grad:abcB=0.1907 param=39.1 ratio=0.004874
+  grad:abcC=0.0011 param=22.5 ratio=0.000048
+  grad:explore=0.0000 param=91.4 ratio=0.000000
+  grad:meta=0.0003 param=35.7 ratio=0.000010
+  grad:abc_to_gate=0.0000 param=1.6 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=13.5 ratio=0.000004
+  grad:p7=0.1977 param=233.0 ratio=0.000848
+  grad:p6=0.0914 param=384.6 ratio=0.000238
+  grad:p3l=0.0025 param=499.3 ratio=0.000005
+  grad:abcA=0.0029 param=47.6 ratio=0.000061
+  grad:abcB=0.0820 param=39.8 ratio=0.002060
+  grad:abcC=0.0011 param=22.8 ratio=0.000046
+  grad:explore=0.0000 param=92.7 ratio=0.000000
+  grad:meta=0.0003 param=35.7 ratio=0.000008
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0001 param=15.0 ratio=0.000006
+  grad:p7=0.1935 param=233.1 ratio=0.000830
+  grad:p6=0.0678 param=385.4 ratio=0.000176
+  grad:p3l=0.0019 param=499.4 ratio=0.000004
+  grad:abcA=0.0184 param=48.4 ratio=0.000379
+  grad:abcB=0.0306 param=40.3 ratio=0.000761
+  grad:abcC=0.0009 param=23.0 ratio=0.000038
+  grad:explore=0.0000 param=93.5 ratio=0.000000
+  grad:meta=0.0002 param=35.8 ratio=0.000005
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0001 param=17.0 ratio=0.000008
+  grad:p7=0.2024 param=233.1 ratio=0.000868
+  grad:p6=0.0491 param=386.0 ratio=0.000127
+  grad:p3l=0.0016 param=499.4 ratio=0.000003
+  grad:abcA=0.0007 param=48.2 ratio=0.000014
+  grad:abcB=0.0305 param=40.5 ratio=0.000751
+  grad:abcC=0.0004 param=23.1 ratio=0.000019
+  grad:explore=0.0000 param=94.0 ratio=0.000000
+  grad:meta=0.0003 param=35.8 ratio=0.000008
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  [WIRE] step=300 phase=explore temp=0.68125 curv=(0.1375284343957901, 0.7) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=250 probe_gain=(0.0019970822613686323, 0.0015941697638481855) cryst_regions=0 kappa={'mean': 2.0056092739105225, 'std': 0.08949016034603119, 'min': 1.7921788692474365, 'max': 2.216860055923462, 'saturated': 0}
+  grad:p7_in=0.0003 param=19.5 ratio=0.000014
+  grad:p7=0.2296 param=233.2 ratio=0.000985
+  grad:p6=0.0507 param=386.4 ratio=0.000131
+  grad:p3l=0.0004 param=499.4 ratio=0.000001
+  grad:abcA=0.0005 param=48.2 ratio=0.000010
+  grad:abcB=0.0342 param=40.7 ratio=0.000840
+  grad:abcC=0.0005 param=23.2 ratio=0.000023
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0003 param=35.8 ratio=0.000008
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0005 param=22.3 ratio=0.000021
+  grad:p7=0.3410 param=233.3 ratio=0.001462
+  grad:p6=0.1039 param=386.9 ratio=0.000269
+  grad:p3l=0.0002 param=499.6 ratio=0.000000
+  grad:abcA=0.0003 param=48.2 ratio=0.000006
+  grad:abcB=0.0229 param=40.9 ratio=0.000561
+  grad:abcC=0.0004 param=23.2 ratio=0.000019
+  grad:explore=0.0000 param=94.5 ratio=0.000000
+  grad:meta=0.0013 param=35.7 ratio=0.000035
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0019 param=25.0 ratio=0.000078
+  grad:p7=0.8801 param=233.4 ratio=0.003770
+  grad:p6=0.3217 param=388.2 ratio=0.000829
+  grad:p3l=0.0002 param=499.7 ratio=0.000000
+  grad:abcA=0.0003 param=48.2 ratio=0.000006
+  grad:abcB=0.0153 param=40.9 ratio=0.000373
+  grad:abcC=0.0003 param=23.3 ratio=0.000011
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0055 param=35.6 ratio=0.000154
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0022 param=27.1 ratio=0.000082
+  grad:p7=0.4922 param=233.6 ratio=0.002106
+  grad:p6=0.3849 param=392.1 ratio=0.000982
+  grad:p3l=0.0003 param=499.8 ratio=0.000001
+  grad:abcA=0.0001 param=48.3 ratio=0.000001
+  grad:abcB=0.0168 param=41.0 ratio=0.000410
+  grad:abcC=0.0003 param=23.3 ratio=0.000012
+  grad:explore=0.0000 param=93.8 ratio=0.000000
+  grad:meta=0.0047 param=35.6 ratio=0.000132
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0831 param=27.6 ratio=0.003016
+  grad:p7=3.9082 param=233.8 ratio=0.016715
+  grad:p6=2.2031 param=397.7 ratio=0.005539
+  grad:p3l=0.0006 param=499.9 ratio=0.000001
+  grad:abcA=0.0005 param=48.3 ratio=0.000011
+  grad:abcB=0.0161 param=41.1 ratio=0.000393
+  grad:abcC=0.0002 param=23.3 ratio=0.000009
+  grad:explore=0.0002 param=93.5 ratio=0.000002
+  grad:meta=0.0168 param=35.7 ratio=0.000470
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.1042 param=27.7 ratio=0.003760
+  grad:p7=4.5517 param=233.9 ratio=0.019460
+  grad:p6=2.0393 param=403.0 ratio=0.005060
+  grad:p3l=0.0006 param=499.9 ratio=0.000001
+  grad:abcA=0.0005 param=48.2 ratio=0.000010
+  grad:abcB=0.0190 param=41.1 ratio=0.000463
+  grad:abcC=0.0002 param=23.3 ratio=0.000007
+  grad:explore=0.0002 param=93.9 ratio=0.000002
+  grad:meta=0.0190 param=35.8 ratio=0.000531
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0671 param=28.1 ratio=0.002389
+  grad:p7=4.0537 param=234.0 ratio=0.017327
+  grad:p6=1.3630 param=407.9 ratio=0.003342
+  grad:p3l=0.0002 param=500.0 ratio=0.000000
+  grad:abcA=0.0001 param=48.1 ratio=0.000002
+  grad:abcB=0.0068 param=41.2 ratio=0.000165
+  grad:abcC=0.0001 param=23.3 ratio=0.000005
+  grad:explore=0.0001 param=94.5 ratio=0.000001
+  grad:meta=0.0121 param=36.1 ratio=0.000334
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0164 param=28.4 ratio=0.000579
+  grad:p7=0.8877 param=234.0 ratio=0.003794
+  grad:p6=0.7214 param=411.7 ratio=0.001752
+  grad:p3l=0.0001 param=500.0 ratio=0.000000
+  grad:abcA=0.0001 param=48.1 ratio=0.000003
+  grad:abcB=0.0085 param=41.2 ratio=0.000207
+  grad:abcC=0.0001 param=23.3 ratio=0.000005
+  grad:explore=0.0001 param=95.0 ratio=0.000001
+  grad:meta=0.0089 param=36.4 ratio=0.000246
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0051 param=28.6 ratio=0.000177
+  grad:p7=0.2034 param=234.0 ratio=0.000869
+  grad:p6=0.2859 param=415.0 ratio=0.000689
+  grad:p3l=0.0002 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=48.0 ratio=0.000002
+  grad:abcB=0.0086 param=41.3 ratio=0.000209
+  grad:abcC=0.0001 param=23.3 ratio=0.000004
+  grad:explore=0.0000 param=94.8 ratio=0.000000
+  grad:meta=0.0016 param=36.7 ratio=0.000044
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0056 param=28.8 ratio=0.000195
+  grad:p7=0.2359 param=234.0 ratio=0.001008
+  grad:p6=0.1971 param=417.7 ratio=0.000472
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.0 ratio=0.000001
+  grad:abcB=0.0036 param=41.3 ratio=0.000088
+  grad:abcC=0.0001 param=23.3 ratio=0.000005
+  grad:explore=0.0000 param=94.7 ratio=0.000000
+  grad:meta=0.0017 param=37.0 ratio=0.000047
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+E  100/300 | loss=0.2089 | ok=0/7 | P3L_max=1.0000 | 0s
+  CE=0.205 A=0.000 B=8.68e-05 C=2.09e-03 gate=0.010 | ema=0.34 aux_s=1.00 [OK]
+  gate占比: base=95% abc=1% sent=4% | ac_raw=2.43
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 它让我感到快乐
+  正确: 我也喜欢吃水果
+======================================================================
+  [WIRE] step=600 phase=crystallize temp=0.4125 curv=(0.43699467182159424, 0.7) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=276 probe_gain=(0.0019455020083114505, 0.0012220887001603842) cryst_regions=0 kappa={'mean': 1.949988603591919, 'std': 0.20729361474514008, 'min': 1.2268362045288086, 'max': 2.7767372131347656, 'saturated': 0}
+  grad:p7_in=0.0092 param=28.9 ratio=0.000317
+  grad:p7=0.4080 param=234.0 ratio=0.001743
+  grad:p6=0.1834 param=419.8 ratio=0.000437
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=48.0 ratio=0.000001
+  grad:abcB=0.0054 param=41.3 ratio=0.000132
+  grad:abcC=0.0001 param=23.3 ratio=0.000004
+  grad:explore=0.0000 param=94.6 ratio=0.000000
+  grad:meta=0.0021 param=37.3 ratio=0.000056
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0108 param=29.1 ratio=0.000372
+  grad:p7=0.8956 param=234.1 ratio=0.003826
+  grad:p6=0.2393 param=421.8 ratio=0.000567
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0000 param=47.9 ratio=0.000000
+  grad:abcB=0.0029 param=41.3 ratio=0.000069
+  grad:abcC=0.0001 param=23.3 ratio=0.000004
+  grad:explore=0.0000 param=94.7 ratio=0.000000
+  grad:meta=0.0049 param=37.7 ratio=0.000131
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0166 param=29.3 ratio=0.000567
+  grad:p7=2.9741 param=234.1 ratio=0.012706
+  grad:p6=0.9662 param=423.6 ratio=0.002281
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0000 param=47.9 ratio=0.000000
+  grad:abcB=0.0029 param=41.4 ratio=0.000070
+  grad:abcC=0.0001 param=23.3 ratio=0.000004
+  grad:explore=0.0002 param=94.8 ratio=0.000002
+  grad:meta=0.0163 param=38.0 ratio=0.000429
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0377 param=29.6 ratio=0.001277
+  grad:p7=6.0057 param=234.1 ratio=0.025656
+  grad:p6=1.4654 param=425.1 ratio=0.003447
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=47.9 ratio=0.000002
+  grad:abcB=0.0027 param=41.4 ratio=0.000065
+  grad:abcC=0.0001 param=23.3 ratio=0.000004
+  grad:explore=0.0003 param=94.7 ratio=0.000004
+  grad:meta=0.0260 param=38.1 ratio=0.000683
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0102 param=29.8 ratio=0.000341
+  grad:p7=0.8230 param=234.1 ratio=0.003516
+  grad:p6=0.1304 param=426.4 ratio=0.000306
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=47.9 ratio=0.000002
+  grad:abcB=0.0030 param=41.4 ratio=0.000071
+  grad:abcC=0.0001 param=23.3 ratio=0.000005
+  grad:explore=0.0000 param=94.6 ratio=0.000000
+  grad:meta=0.0029 param=38.2 ratio=0.000077
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0051 param=30.0 ratio=0.000169
+  grad:p7=0.4290 param=234.1 ratio=0.001832
+  grad:p6=0.0587 param=427.5 ratio=0.000137
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0000 param=47.9 ratio=0.000001
+  grad:abcB=0.0010 param=41.4 ratio=0.000025
+  grad:abcC=0.0001 param=23.3 ratio=0.000005
+  grad:explore=0.0000 param=94.6 ratio=0.000000
+  grad:meta=0.0012 param=38.3 ratio=0.000031
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0019 param=30.1 ratio=0.000062
+  grad:p7=0.2410 param=234.1 ratio=0.001029
+  grad:p6=0.0559 param=428.3 ratio=0.000131
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0000 param=47.9 ratio=0.000000
+  grad:abcB=0.0022 param=41.5 ratio=0.000053
+  grad:abcC=0.0001 param=23.3 ratio=0.000006
+  grad:explore=0.0000 param=94.5 ratio=0.000000
+  grad:meta=0.0009 param=38.4 ratio=0.000023
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0005 param=30.2 ratio=0.000018
+  grad:p7=0.0551 param=234.1 ratio=0.000235
+  grad:p6=0.0250 param=428.8 ratio=0.000058
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=47.9 ratio=0.000001
+  grad:abcB=0.0007 param=41.5 ratio=0.000017
+  grad:abcC=0.0002 param=23.3 ratio=0.000008
+  grad:explore=0.0000 param=94.5 ratio=0.000000
+  grad:meta=0.0003 param=38.5 ratio=0.000009
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0006 param=30.3 ratio=0.000018
+  grad:p7=0.0425 param=234.1 ratio=0.000182
+  grad:p6=0.0100 param=429.2 ratio=0.000023
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=48.0 ratio=0.000002
+  grad:abcB=0.0012 param=41.5 ratio=0.000030
+  grad:abcC=0.0002 param=23.3 ratio=0.000010
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0002 param=38.5 ratio=0.000006
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0005 param=30.3 ratio=0.000018
+  grad:p7=0.0485 param=234.1 ratio=0.000207
+  grad:p6=0.0093 param=429.4 ratio=0.000022
+  grad:p3l=0.0001 param=500.1 ratio=0.000000
+  grad:abcA=0.0001 param=48.0 ratio=0.000003
+  grad:abcB=0.0007 param=41.5 ratio=0.000016
+  grad:abcC=0.0003 param=23.3 ratio=0.000015
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0002 param=38.6 ratio=0.000005
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  [WIRE] step=900 phase=crystallize temp=0.20416666666666666 curv=(0.13139085471630096, 0.7) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=277 probe_gain=(0.0019281810382381082, 0.0011596718104556203) cryst_regions=0 kappa={'mean': 1.9715635776519775, 'std': 0.2542226016521454, 'min': 1.1597535610198975, 'max': 3.119192361831665, 'saturated': 0}
+  grad:p7_in=0.0004 param=30.3 ratio=0.000014
+  grad:p7=0.0280 param=234.1 ratio=0.000119
+  grad:p6=0.0083 param=429.6 ratio=0.000019
+  grad:p3l=0.0002 param=500.1 ratio=0.000000
+  grad:abcA=0.0002 param=48.1 ratio=0.000004
+  grad:abcB=0.0008 param=41.6 ratio=0.000019
+  grad:abcC=0.0009 param=23.3 ratio=0.000038
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0002 param=38.6 ratio=0.000004
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0004 param=30.3 ratio=0.000013
+  grad:p7=0.0292 param=234.2 ratio=0.000125
+  grad:p6=0.0068 param=429.8 ratio=0.000016
+  grad:p3l=0.0005 param=500.1 ratio=0.000001
+  grad:abcA=0.0006 param=48.2 ratio=0.000012
+  grad:abcB=0.0009 param=41.6 ratio=0.000022
+  grad:abcC=0.0017 param=23.4 ratio=0.000074
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0002 param=38.6 ratio=0.000004
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0001 param=30.3 ratio=0.000005
+  grad:p7=0.0117 param=234.2 ratio=0.000050
+  grad:p6=0.0033 param=429.9 ratio=0.000008
+  grad:p3l=0.0007 param=500.2 ratio=0.000001
+  grad:abcA=0.0005 param=48.7 ratio=0.000009
+  grad:abcB=0.0259 param=41.8 ratio=0.000620
+  grad:abcC=0.0111 param=23.6 ratio=0.000471
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0001 param=38.7 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.3 ratio=0.000001
+  grad:p7=0.0040 param=234.2 ratio=0.000017
+  grad:p6=0.0027 param=429.9 ratio=0.000006
+  grad:p3l=0.0002 param=500.3 ratio=0.000000
+  grad:abcA=0.0004 param=49.0 ratio=0.000007
+  grad:abcB=0.0087 param=41.9 ratio=0.000208
+  grad:abcC=0.0021 param=24.1 ratio=0.000086
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0001 param=38.7 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.3 ratio=0.000002
+  grad:p7=0.0041 param=234.2 ratio=0.000018
+  grad:p6=0.0025 param=430.0 ratio=0.000006
+  grad:p3l=0.0002 param=500.6 ratio=0.000000
+  grad:abcA=0.0004 param=49.0 ratio=0.000009
+  grad:abcB=0.0121 param=41.9 ratio=0.000289
+  grad:abcC=0.0021 param=24.6 ratio=0.000085
+  grad:explore=0.0000 param=94.4 ratio=0.000000
+  grad:meta=0.0001 param=38.7 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.3 ratio=0.000001
+  grad:p7=0.0025 param=234.2 ratio=0.000011
+  grad:p6=0.0020 param=430.0 ratio=0.000005
+  grad:p3l=0.0002 param=500.8 ratio=0.000000
+  grad:abcA=0.0002 param=48.9 ratio=0.000003
+  grad:abcB=0.0061 param=42.0 ratio=0.000145
+  grad:abcC=0.0019 param=24.9 ratio=0.000076
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.7 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.3 ratio=0.000001
+  grad:p7=0.0026 param=234.2 ratio=0.000011
+  grad:p6=0.0017 param=430.1 ratio=0.000004
+  grad:p3l=0.0002 param=500.9 ratio=0.000000
+  grad:abcA=0.0000 param=48.6 ratio=0.000001
+  grad:abcB=0.0050 param=42.0 ratio=0.000119
+  grad:abcC=0.0004 param=25.1 ratio=0.000017
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.7 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0036 param=234.2 ratio=0.000015
+  grad:p6=0.0015 param=430.1 ratio=0.000004
+  grad:p3l=0.0001 param=501.0 ratio=0.000000
+  grad:abcA=0.0000 param=48.4 ratio=0.000001
+  grad:abcB=0.0052 param=42.0 ratio=0.000125
+  grad:abcC=0.0011 param=25.3 ratio=0.000043
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.8 ratio=0.000002
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0032 param=234.2 ratio=0.000014
+  grad:p6=0.0014 param=430.1 ratio=0.000003
+  grad:p3l=0.0001 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.3 ratio=0.000001
+  grad:abcB=0.0026 param=42.1 ratio=0.000062
+  grad:abcC=0.0003 param=25.4 ratio=0.000011
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0024 param=234.2 ratio=0.000010
+  grad:p6=0.0013 param=430.2 ratio=0.000003
+  grad:p3l=0.0001 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.2 ratio=0.000001
+  grad:abcB=0.0032 param=42.1 ratio=0.000076
+  grad:abcC=0.0005 param=25.4 ratio=0.000021
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+E  200/300 | loss=0.0036 | ok=0/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=4.62e-05 C=2.09e-03 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=95% abc=1% sent=4% | ac_raw=2.45
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 它让我感到快乐
+  正确: 我也喜欢吃水果
+======================================================================
+  [WIRE] step=1200 phase=crystallize temp=0.1 curv=(0.025737710297107697, 0.7) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=277 probe_gain=(0.0019263200229033828, 0.0011561239371076226) cryst_regions=0 kappa={'mean': 1.9771602153778076, 'std': 0.26432862877845764, 'min': 1.1593424081802368, 'max': 3.1392385959625244, 'saturated': 0}
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0020 param=234.2 ratio=0.000008
+  grad:p6=0.0012 param=430.2 ratio=0.000003
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0018 param=42.1 ratio=0.000043
+  grad:abcC=0.0003 param=25.5 ratio=0.000012
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0019 param=234.2 ratio=0.000008
+  grad:p6=0.0012 param=430.2 ratio=0.000003
+  grad:p3l=0.0001 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0017 param=42.2 ratio=0.000039
+  grad:abcC=0.0002 param=25.5 ratio=0.000009
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0001 param=38.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0019 param=234.2 ratio=0.000008
+  grad:p6=0.0011 param=430.2 ratio=0.000003
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0014 param=42.2 ratio=0.000033
+  grad:abcC=0.0002 param=25.5 ratio=0.000009
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.8 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0019 param=234.2 ratio=0.000008
+  grad:p6=0.0010 param=430.3 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0008 param=42.2 ratio=0.000019
+  grad:abcC=0.0001 param=25.5 ratio=0.000005
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0019 param=234.2 ratio=0.000008
+  grad:p6=0.0010 param=430.3 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.0 ratio=0.000000
+  grad:abcB=0.0009 param=42.3 ratio=0.000022
+  grad:abcC=0.0001 param=25.5 ratio=0.000005
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0020 param=234.2 ratio=0.000008
+  grad:p6=0.0009 param=430.3 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.0 ratio=0.000000
+  grad:abcB=0.0005 param=42.3 ratio=0.000012
+  grad:abcC=0.0001 param=25.5 ratio=0.000004
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0019 param=234.2 ratio=0.000008
+  grad:p6=0.0009 param=430.3 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.0 ratio=0.000000
+  grad:abcB=0.0006 param=42.3 ratio=0.000013
+  grad:abcC=0.0001 param=25.5 ratio=0.000003
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0018 param=234.2 ratio=0.000008
+  grad:p6=0.0009 param=430.4 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.0 ratio=0.000000
+  grad:abcB=0.0003 param=42.3 ratio=0.000008
+  grad:abcC=0.0001 param=25.5 ratio=0.000003
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0017 param=234.2 ratio=0.000007
+  grad:p6=0.0008 param=430.4 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.0 ratio=0.000000
+  grad:abcB=0.0003 param=42.3 ratio=0.000007
+  grad:abcC=0.0000 param=25.5 ratio=0.000002
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=38.9 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000001
+  grad:p7=0.0016 param=234.2 ratio=0.000007
+  grad:p6=0.0008 param=430.4 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0003 param=42.4 ratio=0.000007
+  grad:abcC=0.0001 param=25.5 ratio=0.000002
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.0 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  [WIRE] step=1500 phase=crystallize temp=0.1 curv=(0.16786403954029083, 0.7) coverage={'entropy': 3.9120233058929443, 'coverage': 1.0000000768054784, 'max_density': 0.0, 'zero_regions': 50} betti=collapse_warn=0 reorg=277 probe_gain=(0.001924864249303937, 0.0011546307941898704) cryst_regions=0 kappa={'mean': 1.9823428392410278, 'std': 0.2813608944416046, 'min': 1.1594408750534058, 'max': 3.45424485206604, 'saturated': 0}
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0016 param=234.2 ratio=0.000007
+  grad:p6=0.0008 param=430.4 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0002 param=42.4 ratio=0.000005
+  grad:abcC=0.0000 param=25.5 ratio=0.000002
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.0 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0016 param=234.2 ratio=0.000007
+  grad:p6=0.0008 param=430.5 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0002 param=42.4 ratio=0.000004
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.2 ratio=0.000000
+  grad:meta=0.0000 param=39.0 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0015 param=234.2 ratio=0.000007
+  grad:p6=0.0007 param=430.5 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0002 param=42.4 ratio=0.000004
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.2 ratio=0.000000
+  grad:meta=0.0000 param=39.0 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0015 param=234.2 ratio=0.000006
+  grad:p6=0.0007 param=430.5 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0002 param=42.5 ratio=0.000004
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.2 ratio=0.000000
+  grad:meta=0.0000 param=39.1 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0015 param=234.2 ratio=0.000006
+  grad:p6=0.0007 param=430.5 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0001 param=42.5 ratio=0.000003
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.2 ratio=0.000000
+  grad:meta=0.0000 param=39.1 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0015 param=234.2 ratio=0.000006
+  grad:p6=0.0007 param=430.5 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0001 param=42.5 ratio=0.000003
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.1 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0014 param=234.2 ratio=0.000006
+  grad:p6=0.0007 param=430.6 ratio=0.000002
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0001 param=42.5 ratio=0.000003
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.1 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0014 param=234.2 ratio=0.000006
+  grad:p6=0.0006 param=430.6 ratio=0.000001
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0001 param=42.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.5 ratio=0.000001
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.1 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0013 param=234.2 ratio=0.000006
+  grad:p6=0.0006 param=430.6 ratio=0.000001
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.1 ratio=0.000000
+  grad:abcB=0.0001 param=42.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.5 ratio=0.000002
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.2 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+  grad:p7_in=0.0000 param=30.4 ratio=0.000000
+  grad:p7=0.0013 param=234.2 ratio=0.000006
+  grad:p6=0.0006 param=430.6 ratio=0.000001
+  grad:p3l=0.0000 param=501.1 ratio=0.000000
+  grad:abcA=0.0000 param=48.2 ratio=0.000000
+  grad:abcB=0.0001 param=42.6 ratio=0.000003
+  grad:abcC=0.0000 param=25.5 ratio=0.000002
+  grad:explore=0.0000 param=94.3 ratio=0.000000
+  grad:meta=0.0000 param=39.2 ratio=0.000001
+  grad:abc_to_gate=0.0000 param=1.7 ratio=0.000000
+  grad:sent_to_gate=0.0000 param=6.2 ratio=0.000000
+E  300/300 | loss=0.0030 | ok=0/7 | P3L_max=1.0000 | 0s
+  CE=0.000 A=0.000 B=2.14e-05 C=2.08e-03 gate=0.010 | ema=0.00 aux_s=1.00 [OK]
+  gate占比: base=95% abc=1% sent=4% | ac_raw=2.45
+  lr: p7_in=3.0e-03 p7=1.5e-04 p6=3.0e-03 p3l=2.4e-03 abc=9.0e-03 gate=1.5e-02 master=1.5e-03 abc_prime=1.5e-03
+  预测: 它让我感到快乐
+  正确: 我也喜欢吃水果
+======================================================================
+
+[声学训练] 模拟FFT→文 (低/中/高音) × 30轮 (FFT球面 + 余弦对比)
+  声学E5 loss=7.0433
+  声学E10 loss=1.3647
+  声学E15 loss=1.2617
+  声学E20 loss=1.2828
+  声学E25 loss=1.0441
+  声学E30 loss=1.0563
+  声(低音) → 预测: 高音
+  声(中音) → 预测: 高音
+  声(高音) → 预测: 高音
+
+[保存] /root/rc/v22run/v22_stage1/P1_char_word/checkpoints/V19_BS32.pt
+
+[属性关联度] 训练集首对详情:
+  A句: 我喜欢吃苹果
+  B句: 我也喜欢吃水果
+  ┌─ ABC输出 ───────────────────────
+  │ StageA 结构logits(前5): [-6.768153667449951, -6.588257789611816, -5.125879287719727, -6.1987714767456055, -6.853991985321045]
+  │ StageA 预测类: 6 / 15
+  │ StageB 内容: mean=-0.252 std=4.207 (前5)=[0.20778575539588928, 0.003423154354095459, -0.023063059896230698, -2.1678717136383057, 0.0551658570766449]
+  │ StageC 语气: mean=-3.012 std=157.957 (前5)=[45.306488037109375, 20.40948486328125, 0.10022927820682526, 0.018177669495344162, -0.04115789011120796]
+  └──────────────────────────────────
+  ┌─ P3属性(前8字) ─────────────────
+  │ [我] type=pronoun sem=人物 syn=主语 person=first emot=neutral
+  │ [喜] type=content_word sem=未知 syn=宾语 person=none emot=neutral
+  │ [欢] type=content_word sem=未知 syn=宾语 person=none emot=neutral
+  │ [吃] type=verb sem=行为 syn=宾语 person=none emot=neutral
+  │ [苹] type=content_word sem=未知 syn=宾语 person=none emot=neutral
+  │ [果] type=noun sem=未知 syn=宾语 person=none emot=neutral
+  └──────────────────────────────────
+  ┌─ P3-L 属性关联 (312头前5组) ────
+  │ person(600000值): mean=0.002 max=0.970
+  │ syntax(600000值): mean=0.002 max=0.314
+  │ semantic(500000值): mean=0.002 max=1.000
+  │ sem_entity(400000值): mean=0.002 max=0.136
+  │ sem_abstract(300000值): mean=0.002 max=1.000
+  └──────────────────────────────────
+  ┌─ Gate状态 ───────────────────────
+  │ explore: signal_mean=-1.432
+  │ meta: bias_mean=0.234 bias_std=0.196
+  │ Master: temps=[[0.1967831254005432, 0.3355764150619507, 0.48129379749298096, 0.47927969694137573, 0.5025811195373535]]
+  └──────────────────────────────────
+
+[训练记忆验证]...
+  训练记忆: 0/7 = 0%
+  预测: 中音一起出去走
+  正确: 我也喜欢吃水果
+
+[考试集评测]...
+  考试集: 0.0% (0/16) | 0s
+[日志] /root/rc/v22run/v22_stage1/logs/v19_BS32_125232.txt

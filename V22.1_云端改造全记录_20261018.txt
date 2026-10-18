@@ -1,0 +1,146 @@
+V22.1 云端改造全记录（AMD ROCm · 2026-10-18）
+================================================================================
+
+0. 摘要
+--------
+本次在 AMD Radeon Cloud（W7900D / ROCm 7.2 / torch 2.9.1）上把 V22.1 的 10 个
+"已写代码但未接入训练循环"的组件全部接进训练，修掉 14 处会导致崩溃/失效/不自洽的
+实际问题，并定位到一条结构性 bug：训练路径与评测路径用的不是同一个 sv
+（训练用 sv_rich，评测用裸 sv）。修复后，同一次前向的 CE 与逐位准确率自洽。
+
+代码层面：
+  train_v22_stage1.py   +56 / -6 行
+  v22_vmf_modules.py    +5  / -4 行
+  v22_wire.py           新增（约 14 KB，10 组件接线层 + 仪器）
+  pynvml_stub.py        新增（AMD 无 NVML 占位）
+
+关键实测（SEED=42、4 对数据、300 epoch）：
+  修复前：训练 loss 0.0037，展示路径逐位 acc 1/7，同前向 CE 2.67→7.92
+  修复后：训练 loss 0.0031，展示路径逐位 acc 7/7，同前向 CE 3.14→0.0000
+
+1. 环境
+--------
+- 平台：AMD Radeon Cloud，单卡 W7900D 48 GiB
+- 运行时：torch 2.9.1+rocm7.2.1，Python 3.12（/opt/robotwin-env）
+- 运行方式：nohup 后台 + 日志落盘；所有实验均为小数据快速迭代（4 对 / 300 epoch）
+- AMD 特性：无 NVML ⇒ 训练脚本的 pynvml 依赖用 stub 提供占位读数
+
+2. 组件接线表（10 项）
+--------
+| 组件 | 接线点 | 触发 | 验收判据 | 风险与处理 |
+|---|---|---|---|---|
+| KappaPhaseScheduler | v22_wire.post_step 每步 | 每 step | phase/temp 推进 | 结构上无 κ 引用；κ 写入只能走 trigger_phase_transition，已在 wire 内补 |
+| CompetitiveCrystallization | 每 50 步 record + detect | 每 50 步 | cryst_regions 计数 | 原相似度矩阵在 1-D 激活上退化；mask 改由覆盖度 top-k 密度提供 |
+| SphericalVoronoiProbe | 每 50 步 step(hv.cpu()) | 每 50 步 | 覆盖度统计 | sims>0.5 在 512 维不可达（实测最大余弦 0.117）⇒ 另加 coverage_topk |
+| LocalBettiMonitor | 每 50 步 step + get_status | 每 50 步 | reorg 速率 | 累计计数器无意义 ⇒ 改每千步增量 |
+| PCACurvatureProxy | 每 50 步 step(κ.grad) | 每 50 步 | warn 阈值 0.85 | 需 grad 非 None，已判空 |
+| LocalCurvatureEstimator | 每步 step(grad_norm)+estimate | 每步 | curv 值波动 | 原实现 float.item() 必崩，已修 + 兜底 |
+| MomentumExchangePool | 每 50 步按 optimizer 数 | 每 50 步 | pool_warn | opts 惰性建池 |
+| AdaptiveProbeSet | 每 50 步 compute_info_gain(hv)+refine | 每 50 步 | probe_gain | 原按激活算/写死 1000 步 ⇒ 改按方向 + refine_every 可配 |
+| ActiveExperimentProbe | 每 250 步注入扰动+更新因果矩阵 | 每 250 步 | top_heads | 需 1-D 输入，已修 |
+| SSOL + MutualInformationPenalty | 每步加进 loss（reg_weight 可调） | 每步 | 正则项 | 默认建议 0（先监控），WIRE_REG 控制 |
+
+3. 修复清单
+--------
+3.1 训练入口 train_v22_stage1.py（+56/-6）
+  1) 前置 from v22_vmf_modules import(...)：原 import 在 class MasterGate 之后，直接跑 NameError
+  2) temps = master_gate(sub_losses.unsqueeze(0)).squeeze(0)：vMF forward 含 batch 维，未批输入返回 [1,5]
+  3) SEED 环境变量 + torch/random/numpy 播种：原版无任何种子，无法对照
+  4) 进度条加 acc_same：训练前向逐位准确率（与 CE 同源）
+  5) 展示路径加"同前向: CE=… acc=k/n"：同一 logits 双打印（判定"收敛但评测低"用）
+  6) 新增 _sv_rich_from(sv, ct, p3lf)，展示/考试路径改用它：核心修复
+  7) 删除 attr_a.squeeze(0)（2 处）：attr_a 已是 2-D，squeeze 导致考试集/记忆验证崩溃
+  8) total_steps = epochs × ceil(pairs / batch)：原为 epochs×200 占位，相变永不触发
+  9) WIRE_DISABLE 开关（_NullWire）：干净对照不构造组件、不消耗 RNG
+ 10) wire 实例化 + WIRE_REG 控制正则权重
+
+3.2 组件库 v22_vmf_modules.py（+5/-4）
+  1) LocalCurvatureEstimator.estimate 返回 curvature（原对 float 调 .item() 必崩）
+  2) KappaPhaseScheduler.get_temperature 加 clamp [0.1,1.0]（crystallize progress>1 时负温度）
+  3) LocalCurvatureEstimator.step_threshold 加 clamp（step>total 时阈值变负）
+  4) AdaptiveProbeSet 增加 refine_every，refine 用它取模（原写死 %1000，短跑永不执行）
+
+3.3 新增 v22_wire.py
+  - 微头定义：explore.net[-1].weight 的 256 行方向（与 meta.kappa 一一对应）
+  - κ boost 默认关闭（WIRE_KBOOST=1 才开），上限 κ≤6（防逐维 sigmoid 饱和把 256 个门梯度清零）
+  - 覆盖度：top-5 密度熵
+  - 所有组件调用包 _safe：异常只记一次，不打断训练
+
+4. 结构性 bug 与修复（本次最重要）
+--------
+现象：同一次前向上 CE≈0.002 但逐位准确率 0/8，算术矛盾。
+
+定位：
+  训练（主循环）  pred_all = p6(sv_rich, ..., gate=gates)
+                    sv_rich = sv + abc_prime注入 + 记忆 me 注入
+  展示（:1175）    logits   = p6(sv,      ..., gate=gate)      ← 裸 sv
+  考试（:1366）    同上裸 sv
+  记忆验证（:1241/:1261）p6(sv, ...)（更彻底：无 gate）
+  ⇒ 训练学会依赖注入信号，评测时注入缺席 ⇒ 训练 CE 低、评测 CE 极高
+
+修复：新增 _sv_rich_from(sv, ct, p3lf)（内含 abcD→rd、abcE→me、abc_prime、两份 0.1 注入），
+展示与考试路径改为使用它。
+
+修复前后（SEED=42、wire 开、4 对 300 epoch）：
+  指标                 修复前      修复后
+  训练 loss (E300)     0.0037      0.0031
+  展示路径 ok          1/7         7/7
+  同前向 CE            2.67→7.92   3.14→0.0000
+  同前向 acc           1/7         7/7
+  考试集               0/15        0/15（4 对数据，符合"需 5000~50000 对"的文档预期）
+  崩溃                 0           0
+
+结论：0.0022 vs 0/8 的矛盾来自"两条路径不同源"，不是种子、不是度量 bug、不是接线本身。
+
+5. 仪器（本次新增，零 GPU 成本）
+--------
+  1) SEED 环境变量（默认 42）：torch/random/numpy 三种子
+  2) 同前向双打印：展示路径同时打印该 logits 的 CE 与逐位 acc
+  3) Betti 累计计数 → 每千步速率；coverage 同时打印 top-k 熵与最大熵
+  4) probe refine_every = max(50, total_steps//10)：短跑也会执行
+  5) 曲率阈值 clamp；scheduler 与 curvature 共用 total_steps
+
+6. 接线安全性对照（4 对、300 epoch）
+--------
+| 臂 | 设置 | 末轮 loss | 训练内 ok | 考试集 | 崩溃 | 组件失败 |
+|---|---|---|---|---|---|---|
+| A2 | WIRE_DISABLE=1（不构造任何组件） | 0.0022 | 0/8 | 0/16 | 0 | 0 |
+| B2 | wire 开、WIRE_REG=0（纯监控） | 0.0030 | 0/7 | 0/16 | 0 | 0 |
+
+⇒ 接线不改变训练轨迹量级；此前的 ok 波动来自路径不同源（见第 4 节）与 4 对数据本身。
+
+7. 复现命令
+--------
+  cd <本仓库>
+  # 纯监控（推荐先跑这个）
+  SEED=42 WIRE_REG=0 python train_v22_stage1.py --data v22_train_4.tsv --epochs 300 --display 100 --turbo
+  # 干净对照
+  SEED=42 WIRE_DISABLE=1 python train_v22_stage1.py --data v22_train_4.tsv --epochs 300 --display 100 --turbo
+  # 真实训练（大语料、打开 κ 相变与反冗余正则）
+  SEED=42 WIRE_KBOOST=1 WIRE_REG=0.0005 python train_v22_stage1.py --data <corpus.tsv> --epochs <N> --turbo
+
+8. 已知限制 / 下一步
+--------
+  1) 记忆验证路径（:1241/:1261）仍用裸 p6(sv)，需要时照 _sv_rich_from 改
+  2) κ boost 只做了"安全开关 + 上限"，尚未在真实规模上验证结晶期效果
+  3) 覆盖度/Betti/晶化阈值在 256 维球面上均未按维度校准（经验值）
+  4) 泛化验证需 ≥1500 对（历史：1500 对时考试集 2.1%）；本次因积分耗尽未做
+  5) 8000 对那轮只跑到 E3 即中断，48k 语料未使用
+
+9. 文件与指纹
+--------
+  train_v22_stage1.py    061140f2773d5d562927d0d626c270ed
+  v22_vmf_modules.py     58db68dc6b1f0300e39fb35227ebc7ba
+  v22_wire.py            113b8333d3ec18935a726f68fa22331f
+  pynvml_stub.py         1ebaef2f7d6482a51137077524772310
+  v22_train_4.tsv        690f7b812529d1233235030c831847ce
+
+10. 日志索引（cloud_logs_20261018/）
+--------
+  log_run5_4pairs_nowire.log          无接线基线（4 对，曾出现 7/7，未固定种子）
+  log_run8_wired_4pairs.log           首次接线（出现 0.0016 loss + 0/7，矛盾暴露）
+  log_armA2_clean_control.log         WIRE_DISABLE=1 干净对照
+  log_armB2_monitor.log               wire 纯监控
+  log_armB3_before_svrichfix.log      SEED=42，修复前（1/7，同前向 CE 7.92）
+  log_armB4_after_svrichfix.log       SEED=42，修复后（7/7，同前向 CE 0.0000）
+  log_big1_8000pairs_early.log        8000 对早期（E1-E3，因积分中断）
