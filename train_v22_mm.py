@@ -896,25 +896,43 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
         _all_ids = [words_to_attr_ids(batch[i][2]) for i in range(bs)]
         _lens = torch.tensor([len(x) for x in _all_ids], device=DEVICE, dtype=torch.long)
         _flat = torch.tensor([v for x in _all_ids for v in x], device=DEVICE, dtype=torch.long)
+        _ok_batch = False
         if _flat.numel() >= 2:
             _seg = torch.repeat_interleave(torch.arange(bs, device=DEVICE), _lens)
             _, attns = p3l(_flat)
-            _cnt = torch.bincount(_seg, minlength=bs).clamp(min=1).float()
-            _feats = []
-            for g, scores in attns.items():
-                sc = scores.reshape(-1)
-                _sm = torch.zeros(bs, device=DEVICE).index_add_(0, _seg, sc)
-                _s2 = torch.zeros(bs, device=DEVICE).index_add_(0, _seg, sc * sc)
-                _mean = _sm / _cnt
-                _std = (_s2 / _cnt - _mean * _mean).clamp(min=0).sqrt()
-                _mx = torch.full((bs,), -1e9, device=DEVICE).scatter_reduce_(0, _seg, sc, reduce="amax")
-                _mn = torch.full((bs,), 1e9, device=DEVICE).scatter_reduce_(0, _seg, sc, reduce="amin")
-                _feats += [_mean, _std, (_mx - _mn)]
-            f = torch.stack(_feats, dim=1)
-            f[_lens < 2] = 0
+            _first = next(iter(attns.values()))
+            if _first.numel() == _flat.numel():
+                _cnt = torch.bincount(_seg, minlength=bs).clamp(min=1).float()
+                _feats = []
+                for g, scores in attns.items():
+                    sc = scores.reshape(-1)
+                    _sm = torch.zeros(bs, device=DEVICE).index_add_(0, _seg, sc)
+                    _s2 = torch.zeros(bs, device=DEVICE).index_add_(0, _seg, sc * sc)
+                    _mean = _sm / _cnt
+                    _std = (_s2 / _cnt - _mean * _mean).clamp(min=0).sqrt()
+                    _mx = torch.full((bs,), -1e9, device=DEVICE).scatter_reduce_(0, _seg, sc, reduce="amax")
+                    _mn = torch.full((bs,), 1e9, device=DEVICE).scatter_reduce_(0, _seg, sc, reduce="amin")
+                    _feats += [_mean, _std, (_mx - _mn)]
+                f = torch.stack(_feats, dim=1)
+                f[_lens < 2] = 0
+                _ok_batch = True
+        if not _ok_batch:
+            _pl = []
+            for i in range(bs):
+                aids = _all_ids[i]
+                if len(aids) >= 2:
+                    _, _at = p3l(torch.tensor(aids, device=DEVICE))
+                    _fs = []
+                    for g, sc in _at.items():
+                        sc = sc.reshape(-1)
+                        if sc.numel() > 0: _fs.append(torch.stack([sc.mean(), sc.std(), sc.max() - sc.min()]))
+                    f = torch.cat(_fs) if _fs else torch.zeros(60, device=DEVICE)
+                else:
+                    f = torch.zeros(60, device=DEVICE)
+                _pl.append(F.pad(f, (0, max(0, 128 - f.shape[0])))[:128])
+            p3lf_b = torch.stack(_pl)
         else:
-            f = torch.zeros(bs, 33, device=DEVICE)
-        p3lf_b = F.pad(f, (0, max(0, 128 - f.shape[1])))[:, :128]
+            p3lf_b = F.pad(f, (0, max(0, 128 - f.shape[1])))[:, :128]
         # V21.1: ABC'内容加压 → 双路径(提升ABC控制输入 + 灌入P6解码)
         abc_prime_out = abc_prime(p3lf_b)              # [bs, 128]
         code_b = attr_b[:, :, 384:512].mean(dim=1)          # 代码属性摘要(128D)
