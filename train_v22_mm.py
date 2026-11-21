@@ -1250,7 +1250,7 @@ w(f"  └───────────────────────�
 w(f"  ┌─ Gate状态 ───────────────────────")
 w(f"  │ explore: signal_mean={explore(torch.randn(512,device=DEVICE)).mean().item():.3f}")
 w(f"  │ meta: bias_mean={meta.bias.mean().item():.3f} bias_std={meta.bias.std().item():.3f}")
-w(f"  │ Master: temps={master_gate(torch.randn(5,device=DEVICE)).tolist()}")
+w(f"  │ Master: temps={master_gate(torch.randn(6,device=DEVICE)).tolist()}")
 w(f"  └──────────────────────────────────")
 
 if exam_set:
