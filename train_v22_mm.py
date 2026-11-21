@@ -58,7 +58,7 @@ if os.environ.get("V22_POOL") == "1":
         _CODE_POOL = None
         print(f"[CODE] spawn池不可用({_e!r}), 回落串行CPU", flush=True)
 else:
-    print("[CODE] 串行numpy编码(在CPU预取线程内, 与GPU并行)", flush=True)
+    print("[CODE] 串行numpy编码(主线程备批)", flush=True)
 def _code_mats(words_list, L):
     if _CODE_POOL is None:
         return [p3code.code_np((w, L)) for w in words_list]
@@ -920,14 +920,12 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
     pairs_done = 0
     epoch_batches = [train_set[i:i+current_bs] for i in range(0, len(train_set), current_bs)]
     _n_batches = len(epoch_batches)
-    _th.Thread(target=_feed_batches, args=(epoch_batches,), daemon=True).start()
 
     for _bi, batch in enumerate(epoch_batches):
         bs = len(batch)
         prev_loss = getattr(p7, '_loss_vec', None)
 
-        _pf = _pre_q.get()
-        if isinstance(_pf, Exception): raise _pf
+        _pf = _prep_batch(batch)  # CPU串行备批(ROCm下禁用后台线程, 见segfault)
         max_len_a = _pf["max_len_a"]
         max_len_b = _pf["max_len_b"]
         max_attr = max_len_a
