@@ -83,7 +83,7 @@ def code_np(item):
 
 
 def code_np(item):
-    import re as _re, numpy as _np
+    import re as _re, numpy as np
     _KW = ['def', 'class', 'return', 'if', 'else', 'for', 'while', 'import', 'from', 'print', 'self', 'None', 'True', 'False', 'function', 'const']
     _OPS = [43,45,42,47,37,61,60,62,33,38,124,94,126]
     _BR = [40,41,91,93,123,125]
