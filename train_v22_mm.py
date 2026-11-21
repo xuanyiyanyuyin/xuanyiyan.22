@@ -15,6 +15,12 @@ V19 Turbo — 批量训练 + P3预缓存, GPU利用率 19%→80%+
   python train_v19_turbo.py --data public --epochs 1000 --turbo
 """
 import torch, torch.nn as nn, torch.nn.functional as F, os, sys, random, time, argparse
+def _ortho_(t):
+    try:
+        return _ortho_(t)
+    except Exception:
+        return nn.init.normal_(t, mean=0.0, std=0.02)
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from utils.config import *
 from P7_cross_sent.model import P7WordRouter2048
@@ -25,21 +31,35 @@ class P6_Tied(nn.Module):
         self.max_words = max_words
         self.encoder = nn.Sequential(nn.Linear(sent_dim, hidden_dim), nn.GELU(), nn.Linear(hidden_dim, hidden_dim), nn.GELU())
         self.pos_embed = nn.Parameter(torch.randn(max_words, hidden_dim) * 0.1)
-        self.heads = nn.ModuleList([nn.Linear(hidden_dim, word_dim) for _ in range(max_words)])
-        for h in self.heads: nn.init.xavier_uniform_(h.weight, gain=0.1)
+        self.head = nn.Linear(hidden_dim, word_dim)  # 共享头(跨位置/长度泛化, 替代逐位置独立头)
+        nn.init.xavier_uniform_(self.head.weight, gain=0.1)
     def forward(self, sent_vec, char_weight, gate=None):
         b = sent_vec.shape[0]
         h = self.encoder(sent_vec)
         if gate is not None: h = h * gate
-        words = []
-        for i in range(self.max_words):
-            hi = h + self.pos_embed[i].unsqueeze(0)
-            words.append(self.heads[i](hi))  # [b, 256]
-        pred_vecs = torch.stack(words, dim=1)
+        hi = h.unsqueeze(1) + self.pos_embed.unsqueeze(0)  # [b,max_words,hidden]
+        pred_vecs = self.head(hi)  # 共享头, 跨位置/长度泛化
         logits = torch.matmul(pred_vecs, char_weight.T)  # tied!
         return logits
 from P3_word_attr.stack import P3AttributeStack
 from P3_word_attr.p3l_linkage import P3L_AttributeLinkage
+import p3code
+import faulthandler; faulthandler.dump_traceback_later(45, repeat=True)
+import concurrent.futures as _cf
+_CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(32, (os.cpu_count() or 8)))
+def _code_np_worker(item):
+    return p3code.code_np(item)
+def _code_mats(words_list, L):
+    return list(_CODE_POOL.map(_code_np_worker, [(w, L) for w in words_list]))
+_base_mats = _code_mats(["def _warm(): pass"], 32)  # 提前fork, 避免CUDA初始化后fork
+_ZERO384 = None
+def _base_vec(words):
+    global _ZERO384
+    if _ZERO384 is None: _ZERO384 = torch.zeros(384, device=DEVICE)
+    n = min(len(words), MAXLEN)
+    vecs = [attr_cache.get(words[i], _ZERO384) for i in range(n)]
+    if n < MAXLEN: vecs += [_ZERO384] * (MAXLEN - n)
+    return torch.stack(vecs)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=1000)
@@ -53,42 +73,59 @@ parser.add_argument("--amp", action="store_true", help="FP16混合精度(5070加
 parser.add_argument("--adaptive", action="store_true", help="自适应模式: 监控GPU负载, 自动调batch 1-8")
 parser.add_argument("--adaptive_interval", type=int, default=5, help="自适应检查间隔(秒)")
 parser.add_argument("--quick_test", action="store_true", help="快速测试GPU占比, 几批就停")
+parser.add_argument("--long", action="store_true", help="长话/篇章扩展: max256+ABC_D/F+篇章风格槽(不含记忆E)")
 args = parser.parse_args()
+MAXLEN = 256 if args.long else 128
 
 BATCH_SIZE = args.batch_size
 
 # 自适应GPU负载检测
-import pynvml
-pynvml.nvmlInit()
-_NVML_HANDLE = pynvml.nvmlDeviceGetHandleByIndex(0)
+try:
+    import pynvml
+    pynvml.nvmlInit()
+    _NVML_HANDLE = pynvml.nvmlDeviceGetHandleByIndex(0)
+    _HAS_NVML = True
+except Exception:
+    _HAS_NVML = False  # AMD ROCm 无 pynvml, 用 torch.cuda 回退
 
 def get_gpu_util():
-    """pynvml: C底层API, 毫秒级, 绝不阻塞"""
-    try:
-        return pynvml.nvmlDeviceGetUtilizationRates(_NVML_HANDLE).gpu
-    except Exception:
-        return 50
+    if _HAS_NVML:
+        try:
+            return pynvml.nvmlDeviceGetUtilizationRates(_NVML_HANDLE).gpu
+        except Exception:
+            return 50
+    return 50
 
 def get_gpu_mem_used_mb():
-    """返回已用显存(MB)"""
+    if _HAS_NVML:
+        try:
+            return pynvml.nvmlDeviceGetMemoryInfo(_NVML_HANDLE).used / 1024**2
+        except Exception:
+            pass
     try:
-        info = pynvml.nvmlDeviceGetMemoryInfo(_NVML_HANDLE)
-        return info.used / 1024**2
+        return torch.cuda.memory_allocated() / 1024**2
     except Exception:
         return 0
 
-MEM_LIMIT_MB = 8500
+_TOTAL_VRAM_MB = torch.cuda.get_device_properties(0).total_memory / 1024**2 if torch.cuda.is_available() else 12000
+MEM_LIMIT_MB = int(_TOTAL_VRAM_MB * 0.85)  # 按总显存缩放(12G→10G, 48G→40G)
 _VRAM_BASELINE = None
 
 def set_vram_baseline():
     global _VRAM_BASELINE
     _VRAM_BASELINE = get_gpu_mem_used_mb()
 
-MAX_BATCH_P7 = 32  # P7全词表K/V 6166字, 超32炸显存
+MAX_BATCH_P7 = 32 if _TOTAL_VRAM_MB < 20000 else 512  # 48G 拉满批次
 
 def adaptive_batch_size(current_bs, gpu_util):
     """自适应: 目标GPU利用率85-90%, VRAM不超8.5GB"""
     mem_mb = get_gpu_mem_used_mb()
+    if not _HAS_NVML:  # AMD: 无util, 按显存余量爬批填满
+        if mem_mb > MEM_LIMIT_MB: return max(2, current_bs // 2)
+        if mem_mb < MEM_LIMIT_MB * 0.5: return min(MAX_BATCH_P7, current_bs * 2)
+        if mem_mb < MEM_LIMIT_MB * 0.75: return min(MAX_BATCH_P7, current_bs + 32)
+        if mem_mb < MEM_LIMIT_MB * 0.9: return min(MAX_BATCH_P7, current_bs + 8)
+        return current_bs
     if _VRAM_BASELINE and mem_mb - _VRAM_BASELINE < 200:
         pass  # 训练VRAM增长<200MB, 不是训练在吃, 放心加batch
     if mem_mb > MEM_LIMIT_MB:
@@ -137,7 +174,7 @@ with open(path, 'r', encoding='utf-8') as f:
         if is_cover:
             wa = [c for c in a if c.strip() and ord(c)>32]
             wb = [c for c in b if c.strip() and ord(c)>32]
-            if 3<=len(wa)<=80 and 3<=len(wb)<=80:
+            if 3<=len(wa)<=MAXLEN and 3<=len(wb)<=MAXLEN:
                 all_pairs.append((wa, wb))
         else:
             sa = [p.strip() for p in SENT_SPLIT.split(a) if len(p.strip())>=3]
@@ -163,7 +200,7 @@ w(f"  字符: {n_chars}个 | 句子: {len(all_pairs)}对")
 
 # 正交字符embeddding: 每字独立方向, 无cos混淆
 char_embed = nn.Embedding(n_chars, 256, padding_idx=0).to(DEVICE)
-nn.init.orthogonal_(char_embed.weight)
+_ortho_(char_embed.weight)
 
 encoded = []
 for A, B in all_pairs:
@@ -250,22 +287,41 @@ if True:
                 # Layer3: 风格(116-125) — P3暂不提供, 留空
         except Exception:
             pass
+        # 风格/语气槽116-120 (细腻度, 0参数规则): 标点/数字/拉丁/语气词
+        vec[116] = 1.0 if char in '，、；：' else 0.0
+        vec[117] = 1.0 if char in '。！？!?' else 0.0
+        vec[118] = 1.0 if char.isdigit() else 0.0
+        vec[119] = 1.0 if (char.isascii() and char.isalpha()) else 0.0
+        vec[120] = 1.0 if char in '呢吗吧啊呀嘛哦' else 0.0
+        # 时态37-39 / 人称40-41 / 关联76-80 / 语用84-86 (激活空槽, 0参数规则)
+        vec[37] = 1.0 if char in '了过' else 0.0
+        vec[38] = 1.0 if char in '将会正要' else 0.0
+        vec[40] = 1.0 if char in '我你您' else 0.0
+        vec[41] = 1.0 if char in '他她它' else 0.0
+        vec[76] = 1.0 if char in '因' else 0.0
+        vec[77] = 1.0 if char in '所' else 0.0
+        vec[78] = 1.0 if char in '但' else 0.0
+        vec[79] = 1.0 if char in '而' else 0.0
+        vec[80] = 1.0 if char in '如' else 0.0
+        vec[84] = 1.0 if char in '？?' else 0.0
+        vec[85] = 1.0 if char in '！!' else 0.0
+        vec[86] = 1.0 if char in '请谢' else 0.0
         attr_cache[char] = vec.to(DEVICE)
     w(f"  预缓存: {len(attr_cache)}字 × 128D = {len(attr_cache)*128*4/1024:.1f}KB GPU | {time.time()-t0:.0f}s")
 
 # ════════════════════════ 2. 模型 ════════════════════════
 w(f"\n[模型] {MODE}: CharEmbed→P7→P3→P3-L→ABC→Gate→P6")
-p7 = P7WordRouter2048(word_dim=256, inner_dim=256, heads=16, head_dim=16, max_len=128, num_groups=4).to(DEVICE)  # 16头×16D, 总256D, 2x
-p6 = P6_Tied(max_words=128, word_dim=256).to(DEVICE)  # encoder 1024D
+p7 = P7WordRouter2048(word_dim=256, inner_dim=256, heads=16, head_dim=16, max_len=MAXLEN, num_groups=4).to(DEVICE)  # 16头×16D, 总256D, 2x
+p6 = P6_Tied(max_words=MAXLEN, word_dim=256).to(DEVICE)  # encoder 1024D
 p3l = P3L_AttributeLinkage(attr_dim=384, num_attr_values=500, enable_vision=True).to(DEVICE)  # V22: 视觉扩展 384D + 视觉组
-p7_input_proj = nn.Linear(640, 256, bias=False).to(DEVICE)  # A256D+P3(384D=语言128+视觉256)→256D
+p7_input_proj = nn.Linear(768, 256, bias=False).to(DEVICE)  # A256D+P3(384D=语言128+视觉256)→256D
 
 # ════════════════════════ Master Gate (5子gate→5维温控) ════════════════════════
 class MasterGate(nn.Module):
     """总Gate: 5个子gate是否达标 → 5路温控(0-1)"""
     def __init__(self):
         super().__init__()
-        self.net = nn.Sequential(nn.Linear(5, 32), nn.GELU(), nn.Linear(32, 32), nn.GELU(), nn.Linear(32, 5))
+        self.net = nn.Sequential(nn.Linear(6, 32), nn.GELU(), nn.Linear(32, 32), nn.GELU(), nn.Linear(32, 6))
         for l in self.net:
             if isinstance(l, nn.Linear): nn.init.xavier_uniform_(l.weight, gain=0.1); nn.init.zeros_(l.bias)
     def forward(self, sub_losses):  # sub_losses: [5] — P7_loss, A_loss, B_loss, C_loss, cos_loss
@@ -279,7 +335,7 @@ opt_master = torch.optim.Adam(master_gate.parameters(), lr=args.lr * 0.5)
 # ABC模块 (同全模块版)
 class ABC_StageA(nn.Module):
     """A: 结构决策 20类 — 对齐 14语言模块 + 5视觉大类 P3颗粒度 (V22)"""
-    def __init__(self, in_dim=640, hidden=128, n_classes=20):
+    def __init__(self, in_dim=768, hidden=128, n_classes=21):
         super().__init__()
         self.encoder = nn.Sequential(nn.Linear(in_dim, hidden*2), nn.GELU(), nn.Linear(hidden*2, hidden), nn.GELU())
         self.pool = nn.Linear(hidden, hidden)
@@ -298,7 +354,7 @@ class ABC_StageB(nn.Module):
     """B: 内容填充 384D — 对齐P3 (V22: 128语言+256视觉, mask 自动过滤未激活槽)"""
     def __init__(self, hidden=128, content_dim=384):
         super().__init__()
-        self.fuse = nn.Sequential(nn.Linear(128+384+128, 256), nn.GELU(), nn.Linear(256, 128), nn.GELU(), nn.Linear(128, content_dim))  # V22: attr_sum 128→384
+        self.fuse = nn.Sequential(nn.Linear(128+512+128, 256), nn.GELU(), nn.Linear(256, 128), nn.GELU(), nn.Linear(128, content_dim))  # V22: attr_sum 128→384
         for m in self.modules():
             if isinstance(m, nn.Linear): nn.init.xavier_uniform_(m.weight, gain=0.5); nn.init.zeros_(m.bias)
     def forward(self, a_hidden, attr_vec, p3l_feat):
@@ -337,11 +393,72 @@ class ABC_Prime(nn.Module):
         return self.net(p3l_feat)
 
 abc_prime = ABC_Prime().to(DEVICE)
+code_link = nn.Linear(128, 128, bias=False).to(DEVICE)
+nn.init.normal_(code_link.weight, std=0.03)
+code_head = nn.Linear(384, 128).to(DEVICE)
+is_code_head = nn.Linear(384, 1).to(DEVICE)
+
+
+# ════════════════════════ V22.2 长话/篇章扩展 (D/F, 不含记忆E) ════════════════════════
+def discourse_features(words):
+    """0参数规则篇章特征[8]: 句数/连接词密度/问/叹/平均句长/代称密度/规模。非记忆。"""
+    s = ''.join(words)
+    sents = [x for x in re.split(r'[。！？；]', s) if x.strip()]
+    n = max(len(sents), 1)
+    conn = sum(s.count(c) for c in '因为所以但是而且如果虽然因此于是接着然后')
+    q = s.count('？') + s.count('?'); ex = s.count('！') + s.count('!')
+    pron = sum(s.count(c) for c in '你我他她它们您')
+    L = max(len(s), 1)
+    return torch.tensor([n/8.0, conn/L, q/n, ex/n, (L/n)/40.0, pron/L, min(n,8)/8.0, L/80.0], device=DEVICE)
+
+
+class ABC_StageD(nn.Module):
+    """D: 关系审查/篇章连贯 — 消费篇章特征+属性均值, 残差注入内容(不存记忆)。"""
+    def __init__(self, attr_dim=512, disc_dim=8, hidden=128, out_dim=384):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(attr_dim+disc_dim, hidden), nn.GELU(), nn.Linear(hidden, out_dim))
+        for m in self.net:
+            if isinstance(m, nn.Linear): nn.init.xavier_uniform_(m.weight, gain=0.01); nn.init.zeros_(m.bias)
+    def forward(self, attr_vec, disc):
+        a = attr_vec.mean(dim=1)
+        return self.net(torch.cat([a, disc], dim=-1))
+
+
+class ABC_StageF(nn.Module):
+    """F: 输出精炼 — 风格槽调制逐位置句向量, 残差注入(细腻度)。"""
+    def __init__(self, dim=256, style_dim=10, hidden=256):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(dim+style_dim, hidden), nn.GELU(), nn.Linear(hidden, dim))
+        for m in self.net:
+            if isinstance(m, nn.Linear): nn.init.xavier_uniform_(m.weight, gain=0.01); nn.init.zeros_(m.bias)
+    def forward(self, sv, style):
+        return self.net(torch.cat([sv, style], dim=-1))
+
+
+abcD = ABC_StageD().to(DEVICE)
+abcF = ABC_StageF().to(DEVICE)
+
+
+# ════════════════════════ 输入上下文: 位置编码+自注意力 (修输入侧泛化缺口, 非记忆) ════════════════════════
+class InputCtx(nn.Module):
+    def __init__(self, dim=256, maxlen=256, heads=8):
+        super().__init__()
+        self.pos = nn.Parameter(torch.randn(maxlen, dim) * 0.1)
+        self.sa = nn.MultiheadAttention(dim, heads, batch_first=True)
+        self.ln1 = nn.LayerNorm(dim); self.ln2 = nn.LayerNorm(dim)
+        self.ffn = nn.Sequential(nn.Linear(dim, 512), nn.GELU(), nn.Linear(512, dim))
+    def forward(self, e):
+        x = e + self.pos[:e.shape[1]].unsqueeze(0)          # 输入位置编码
+        x = self.ln1(x + self.sa(x, x, x, need_weights=False)[0])  # 输入自注意力(字符间上下文)
+        x = self.ln2(x + self.ffn(x))
+        return x
+input_ctx = InputCtx(maxlen=MAXLEN).to(DEVICE)
+def embed_ctx(ids): return input_ctx(char_embed(ids))
 
 GATE_DIM = 256  # 主Gate: 仅管P6 encoder (cos loss → P6调制)
 
 class TurboExplore(nn.Module):
-    def __init__(self, in_dim=384, hidden=512):
+    def __init__(self, in_dim=512, hidden=512):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(in_dim, hidden), nn.GELU(), nn.Linear(hidden, hidden), nn.GELU(), nn.Linear(hidden, 256))
         for l in self.net:
@@ -353,6 +470,8 @@ class TurboMeta(nn.Module):
     def forward(self, x): return torch.sigmoid((self.bias + x) / 10.0)  # 压缩输入, 防饱和
 
 explore = TurboExplore().to(DEVICE)
+code_to_gate = nn.Linear(128, 128, bias=False).to(DEVICE)
+nn.init.normal_(code_to_gate.weight, std=0.03)
 meta = TurboMeta().to(DEVICE)
 abc_to_gate = nn.Linear(48, 128, bias=False).to(DEVICE)   # ABC→128D
 sent_to_gate = nn.Linear(256, 128, bias=False).to(DEVICE)  # sent→128D
@@ -370,13 +489,14 @@ n_all = sum(p.numel() for m in [p7,p6,p3l,abcA,abcB,abcC,abc_prime,explore,meta,
 w(f"  CharEmbed:{n_embed:,} | P7:{sum(p.numel() for p in p7.parameters()):,} | P6:{sum(p.numel() for p in p6.parameters()):,} | 总:{n_all:,}")
 w(f"  总参数: {n_all:,} | batch_size={BATCH_SIZE}")
 
-opt_embed = None  # char_embed冻结: 固定靶
+opt_embed = torch.optim.Adam(char_embed.parameters(), lr=args.lr)  # char_embed可学(语义字符嵌入, 修复冻结泛化瓶颈)
+opt_in = torch.optim.Adam(input_ctx.parameters(), lr=args.lr)  # 输入pos+self-attn
 
 # ════════════════════════ 维度校验 ════════════════════════
 w(f"\n[校验] 架构维度一致性...")
 assert p7.word_dim == 256, f"P7 word_dim={p7.word_dim}"
 assert p7.heads == 16 and p7.head_dim == 16, f"P7头"
-assert p7_input_proj.in_features == 640, f"p7_in in={p7_input_proj.in_features}"
+assert p7_input_proj.in_features == 768, f"p7_in in={p7_input_proj.in_features}"
 assert abc_to_gate.in_features == 48, f"abc_to_gate in={abc_to_gate.in_features}"
 assert abc_to_gate.out_features == 128, f"abc_to_gate out={abc_to_gate.out_features}"
 assert sent_to_gate.in_features == 256, f"sent_to_gate in={sent_to_gate.in_features}"
@@ -417,8 +537,8 @@ opt_p7_in = torch.optim.Adam(p7_input_proj.parameters(), lr=slr_p7_in.lr)
 opt_p7  = torch.optim.Adam(p7.parameters(), lr=slr_p7.lr)
 opt_p6  = torch.optim.Adam(p6.parameters(), lr=slr_p6.lr)
 opt_p3l = torch.optim.Adam(p3l.parameters(), lr=slr_p3l.lr)
-opt_abc = torch.optim.Adam(list(abcA.parameters())+list(abcB.parameters())+list(abcC.parameters()), lr=slr_abc.lr)
-opt_gate= torch.optim.Adam(list(explore.parameters())+list(meta.parameters())+list(abc_to_gate.parameters())+list(sent_to_gate.parameters())+list(gate_base_proj.parameters())+list(abc_to_sent.parameters()), lr=slr_gate.lr)
+opt_abc = torch.optim.Adam(list(abcA.parameters())+list(abcB.parameters())+list(abcC.parameters())+list(abcD.parameters())+list(abcF.parameters())+list(code_head.parameters())+list(is_code_head.parameters()), lr=slr_abc.lr)
+opt_gate= torch.optim.Adam(list(explore.parameters())+list(meta.parameters())+list(abc_to_gate.parameters())+list(sent_to_gate.parameters())+list(gate_base_proj.parameters())+list(abc_to_sent.parameters())+list(code_to_gate.parameters()), lr=slr_gate.lr)
 opt_abc_prime = torch.optim.Adam(abc_prime.parameters(), lr=slr_abc_prime.lr)  # V21.1
 
 
@@ -526,31 +646,41 @@ def words_to_attr_vec(words):
     """从预缓存组装attr_vec — 有缓存用缓存, 无缓存实时P3"""
     if args.turbo or len(attr_cache) > 100:  # 有预缓存就用
         vecs = []
-        for w in words[:80]:
+        for w in words[:MAXLEN]:
             if w in attr_cache: vecs.append(attr_cache[w])
             else: vecs.append(torch.zeros(384, device=DEVICE))  # V22: attr 384
-        if len(vecs) < 80:
-            pad = torch.zeros(80-len(vecs), 384, device=DEVICE)  # V22: attr 384
-            return torch.cat([torch.stack(vecs), pad])
-        return torch.stack(vecs)
+        if len(vecs) < MAXLEN:
+            pad = torch.zeros(MAXLEN-len(vecs), 384, device=DEVICE)  # V22: attr 384
+            base=torch.cat([torch.stack(vecs), pad]); return torch.cat([base, p3code.code_mat(words, base.shape[0], base.device)], dim=-1)
+        base=torch.stack(vecs); return torch.cat([base, p3code.code_mat(words, base.shape[0], base.device)], dim=-1)
     else:
         # ECO模式: 实时P3处理
-        packets = p3_stack.process_sentence(words[:80])
-        return _packets_to_vec([p.to_dict() for p in packets])
+        packets = p3_stack.process_sentence(words[:MAXLEN])
+        base=_packets_to_vec([p.to_dict() for p in packets]); return torch.cat([base, p3code.code_mat(words, base.shape[0], base.device)], dim=-1)
+
+_AID_MEMO = {}
+def _pkt_ids(p):
+    d = p.to_dict()
+    bt = d.get("basic_type", ("",))
+    if isinstance(bt, tuple): bt = bt[0]
+    ids = [_aid(f"bt:{bt}")]
+    sem = d.get("semantic_types", [])
+    for s in sem[:2]:
+        if isinstance(s,(tuple,list)) and len(s)>=1: ids.append(_aid(f"sem:{s[0]}"))
+    syn = d.get("syntax_candidates", [])
+    if syn and isinstance(syn[0],(tuple,list)): ids.append(_aid(f"syn:{syn[0][0]}"))
+    return ids
 
 def words_to_attr_ids(words):
-    packets = p3_stack.process_sentence(words)
+    miss = []
+    for c in words:
+        if c not in _AID_MEMO and c not in miss: miss.append(c)
+    if miss:
+        pkts = p3_stack.process_sentence(miss)
+        for i, c in enumerate(miss):
+            _AID_MEMO[c] = _pkt_ids(pkts[i]) if i < len(pkts) else []
     ids = []
-    for p in packets:
-        d = p.to_dict()
-        bt = d.get("basic_type", ("",))
-        if isinstance(bt, tuple): bt = bt[0]
-        ids.append(_aid(f"bt:{bt}"))
-        sem = d.get("semantic_types", [])
-        for s in sem[:2]:
-            if isinstance(s,(tuple,list)) and len(s)>=1: ids.append(_aid(f"sem:{s[0]}"))
-        syn = d.get("syntax_candidates", [])
-        if syn and isinstance(syn[0],(tuple,list)): ids.append(_aid(f"syn:{syn[0][0]}"))
+    for c in words: ids.extend(_AID_MEMO.get(c, []))
     return list(set(ids))
 
 def p3l_features(attr_ids, wo_feat=None):
@@ -665,6 +795,7 @@ def save_best(sig=None, frame=None):
     path = os.path.join(SAVE_DIR, "V21_best.pt")
     torch.save({"char_embed":char_embed.state_dict(),"p7in":p7_input_proj.state_dict(),"p7":p7.state_dict(),"p6":p6.state_dict(),"p3l":p3l.state_dict(),
                 "abcA":abcA.state_dict(),"abcB":abcB.state_dict(),"abcC":abcC.state_dict(),
+                "abcD":abcD.state_dict(),"abcF":abcF.state_dict(),
                 "abc_prime":abc_prime.state_dict(),  # V21.1
                 "abc_to_sent":abc_to_sent.state_dict(),  # V21.1
                 "explore":explore.state_dict(),"meta":meta.state_dict(),"master":master_gate.state_dict(),
@@ -675,6 +806,29 @@ def save_best(sig=None, frame=None):
     if sig: sys.exit(0)
 signal.signal(signal.SIGINT, save_best)
 signal.signal(signal.SIGTERM, save_best)
+
+# ── 断点续训: latest 存点(模型+优化器+epoch), 周期保存+启动恢复 ──
+START_EPOCH = 0
+_latest = os.path.join(SAVE_DIR, "V22_latest.pt")
+def save_latest(ep):
+    torch.save({"char_embed":char_embed.state_dict(),"p7in":p7_input_proj.state_dict(),"p7":p7.state_dict(),"p6":p6.state_dict(),"p3l":p3l.state_dict(),
+        "abcA":abcA.state_dict(),"abcB":abcB.state_dict(),"abcC":abcC.state_dict(),"abcD":abcD.state_dict(),"abcF":abcF.state_dict(),
+        "abc_prime":abc_prime.state_dict(),"abc_to_sent":abc_to_sent.state_dict(),"explore":explore.state_dict(),"meta":meta.state_dict(),"master":master_gate.state_dict(),
+        "abc_to_gate":abc_to_gate.state_dict(),"sent_to_gate":sent_to_gate.state_dict(),"gate_base_proj":gate_base_proj.state_dict(),"input_ctx":input_ctx.state_dict(),
+        "opt_p7in":opt_p7_in.state_dict(),"opt_p7":opt_p7.state_dict(),"opt_p6":opt_p6.state_dict(),"opt_p3l":opt_p3l.state_dict(),"opt_abc":opt_abc.state_dict(),"opt_gate":opt_gate.state_dict(),"opt_abc_prime":opt_abc_prime.state_dict(),"opt_master":opt_master.state_dict(),"opt_in":opt_in.state_dict(),
+        "opt_embed":opt_embed.state_dict(),"c2i":c2i,"epoch":ep,"loss":best_loss}, _latest)
+if os.path.exists(_latest):
+    lk = torch.load(_latest, map_location=DEVICE, weights_only=True)
+    START_EPOCH = lk.get("epoch", 0)
+    for name, mod in [("char_embed",char_embed),("p7in",p7_input_proj),("p7",p7),("p6",p6),("p3l",p3l),("abcA",abcA),("abcB",abcB),("abcC",abcC),("abcD",abcD),("abcF",abcF),("abc_prime",abc_prime),("abc_to_sent",abc_to_sent),("explore",explore),("meta",meta),("master",master_gate),("abc_to_gate",abc_to_gate),("sent_to_gate",sent_to_gate),("gate_base_proj",gate_base_proj),("input_ctx",input_ctx)]:
+        if name in lk:
+            try: mod.load_state_dict(lk[name], strict=False)
+            except Exception: pass
+    for name, o in [("opt_p7in",opt_p7_in),("opt_p7",opt_p7),("opt_p6",opt_p6),("opt_p3l",opt_p3l),("opt_abc",opt_abc),("opt_gate",opt_gate),("opt_abc_prime",opt_abc_prime),("opt_master",opt_master),("opt_embed",opt_embed),("opt_in",opt_in)]:
+        if name in lk:
+            try: o.load_state_dict(lk[name])
+            except Exception: pass
+    w(f"[断点续训] 从 E{START_EPOCH} 恢复(模型+优化器)")
 
 def make_batches(data, bs):
     """按长度分组做batch (减少padding浪费)"""
@@ -688,7 +842,7 @@ def make_batches(data, bs):
 
 current_bs = BATCH_SIZE
 
-for ep in range(1, args.epochs+1):
+for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
     t0 = time.time(); total_loss, n = 0.0, 0
     total_ce, total_A, total_B, total_C, total_gate = 0.0, 0.0, 0.0, 0.0, 0.0
     last_temps, last_scale = None, 0.0
@@ -717,11 +871,14 @@ for ep in range(1, args.epochs+1):
         # ── P7: 批量 (输入升级为192D) ──
         a_lens = [len(batch[i][0]) for i in range(bs)]
         # P7: 词向量+P3属性拼接→p7_input_proj→128D→全词表路由
-        Av_emb = char_embed(Av_batch_ids[:, :max_len_a])
-        attr_for_p7 = torch.zeros(bs, max_len_a, 384, device=DEVICE)  # V22: 128语言+256视觉
-        for i, (ids_a, ids_b, A_words, _) in enumerate(batch):
-            av = words_to_attr_vec(A_words)[:max_len_a, :]
-            attr_for_p7[i, :av.shape[0], :] = av
+        Av_emb = embed_ctx(Av_batch_ids[:, :max_len_a])
+        attr_for_p7 = torch.zeros(bs, max_len_a, 512, device=DEVICE)  # V22: 128语言+256视觉+128代码
+        _wl = [b[2] for b in batch]
+        _codes = _code_mats(_wl, max_len_a)
+        for i, A_words in enumerate(_wl):
+            _b = _base_vec(A_words)[:max_len_a]
+            _c = torch.from_numpy(_codes[i][:max_len_a]).to(DEVICE)
+            attr_for_p7[i, :_b.shape[0], :] = torch.cat([_b, _c], dim=-1)
         Av_rich = torch.cat([Av_emb, attr_for_p7], dim=-1)
         vocab = char_embed.weight.detach()
         with torch.amp.autocast('cuda', enabled=args.amp):
@@ -730,29 +887,42 @@ for ep in range(1, args.epochs+1):
                 a_lens, [vocab.shape[0]]*bs, last_loss=0.0)
 
         # ABC: P3属性 + P7词级路由
-        attr_b = attr_for_p7.clone()  # 独立副本防别名
-        for i, (ids_a, ids_b, A_words, _) in enumerate(batch):
-            av = words_to_attr_vec(A_words)[:max_len_a, :]
-            attr_b[i, :av.shape[0], :] = av
+        attr_b = attr_for_p7.clone()  # A/B共用输入属性(原重复计算两遍, 现复用)
+        if args.long:
+            disc_b = torch.stack([discourse_features(batch[i][2]) for i in range(bs)])
+            attr_b[:, :, 96:104] = disc_b.unsqueeze(1).expand(-1, attr_b.shape[1], -1)  # 篇章槽(非记忆)
         # P3-L: 属性联动特征
         p3lf_list = []
-        for i in range(bs):
-            aids = words_to_attr_ids(batch[i][2])
-            if len(aids) >= 2:
-                _, attns = p3l(torch.tensor(aids, device=DEVICE))
-                feats = []
-                for g, scores in attns.items():
-                    if scores.numel() > 0: feats.append(torch.stack([scores.mean(), scores.std(), scores.max() - scores.min()]))
-                f = torch.cat(feats) if feats else torch.zeros(60, device=DEVICE)
-            else:
-                f = torch.zeros(60, device=DEVICE)
-            p3lf_list.append(F.pad(f, (0, max(0, 128 - f.shape[0])))[:128])
-        p3lf_b = torch.stack(p3lf_list)
+        _all_ids = [words_to_attr_ids(batch[i][2]) for i in range(bs)]
+        _lens = torch.tensor([len(x) for x in _all_ids], device=DEVICE, dtype=torch.long)
+        _flat = torch.tensor([v for x in _all_ids for v in x], device=DEVICE, dtype=torch.long)
+        if _flat.numel() >= 2:
+            _seg = torch.repeat_interleave(torch.arange(bs, device=DEVICE), _lens)
+            _, attns = p3l(_flat)
+            _cnt = torch.bincount(_seg, minlength=bs).clamp(min=1).float()
+            _feats = []
+            for g, scores in attns.items():
+                sc = scores.reshape(-1)
+                _sm = torch.zeros(bs, device=DEVICE).index_add_(0, _seg, sc)
+                _s2 = torch.zeros(bs, device=DEVICE).index_add_(0, _seg, sc * sc)
+                _mean = _sm / _cnt
+                _std = (_s2 / _cnt - _mean * _mean).clamp(min=0).sqrt()
+                _mx = torch.full((bs,), -1e9, device=DEVICE).scatter_reduce_(0, _seg, sc, reduce="amax")
+                _mn = torch.full((bs,), 1e9, device=DEVICE).scatter_reduce_(0, _seg, sc, reduce="amin")
+                _feats += [_mean, _std, (_mx - _mn)]
+            f = torch.stack(_feats, dim=1)
+            f[_lens < 2] = 0
+        else:
+            f = torch.zeros(bs, 33, device=DEVICE)
+        p3lf_b = F.pad(f, (0, max(0, 128 - f.shape[1])))[:, :128]
         # V21.1: ABC'内容加压 → 双路径(提升ABC控制输入 + 灌入P6解码)
         abc_prime_out = abc_prime(p3lf_b)              # [bs, 128]
-        p3lf_rich = p3lf_b + abc_prime_out * 0.1       # 渐进注入, 初始0.1防冲
+        code_b = attr_b[:, :, 384:512].mean(dim=1)          # 代码属性摘要(128D)
+        p3lf_rich = p3lf_b + abc_prime_out * 0.1 + code_link(code_b) * 0.1  # P3-L代码关联
         a_logits, ah = abcA(attr_b, wo_batch[:, :max_len_a, :])
         ct = abcB(ah, attr_b, p3lf_rich)               # V21.1: 加压后特征
+        if args.long:
+            ct = ct + 0.1 * abcD(attr_b, disc_b)       # D: 篇章连贯残差(不存记忆)
         ac_batch = abcC(ct, attr_b)
         ac_batch = ac_batch / (ac_batch.norm(dim=-1, keepdim=True) + 1.0)  # 软归一化, 保动态范围
 
@@ -796,22 +966,25 @@ for ep in range(1, args.epochs+1):
             if not hasattr(p7, 'g_base_sum'): p7.g_base_sum = p7.g_aux_sum = p7.g_sent_sum = p7.g_ac_sum = 0.0
             p7.g_base_sum += gb; p7.g_aux_sum += ga; p7.g_sent_sum += gs; p7.g_ac_sum += ac_batch.norm().item()
             # 三路独立通道拼接: 128+128+128=384D, 不竞争不截幅
-            gate_input = torch.cat([gate_base_proj(abc_conf), aux_scale*abc_to_gate(ac_batch), aux_scale*sent_to_gate(sv_batch)], dim=-1)
+            gate_input = torch.cat([gate_base_proj(abc_conf), aux_scale*abc_to_gate(ac_batch), aux_scale*sent_to_gate(sv_batch), aux_scale*code_to_gate(code_b)], dim=-1)
             gates = meta(explore(gate_input))
             # V21.1: abc_prime加法注入sent (保sv_batch主导, abc_prime渐进参与)
             sv_rich = sv_batch + abc_to_sent(abc_prime_out) * 0.1
+            if args.long:
+                sv_rich = sv_rich + 0.1 * abcF(sv_rich, attr_b[:, :, 116:126].mean(1))  # F: 风格精炼(细腻度)
             pred_all = p6(sv_rich, char_embed.weight, gate=gates)
 
         # 主loss: cross_entropy直出字
-        ce_loss = 0.0; ok_count = 0; total_pos = 0
+        ce_loss = 0.0; _ok_t = torch.zeros((), dtype=torch.long, device=DEVICE); total_pos = 0
         for i in range(bs):
             nB = min(len(batch[i][1]), pred_all.shape[1])
             b_ids = torch.tensor([c2i.get(c, 0) for c in batch[i][3][:nB]], device=DEVICE)
             ce_loss += F.cross_entropy(pred_all[i, :nB, :], b_ids, ignore_index=0)
             pred_ids = pred_all[i, :nB, :].argmax(dim=-1)
-            ok_count += (pred_ids == b_ids).sum().item()
+            _ok_t = _ok_t + (pred_ids == b_ids).sum()
             total_pos += nB
         ce_loss = ce_loss / bs
+        ok_count = int(_ok_t.item())
         cos_val = ok_count / max(total_pos, 1)
         p7._loss_vec = F.pad(torch.tensor([cos_val, ce_loss.item()], device=DEVICE), (0, 10))
 
@@ -830,20 +1003,24 @@ for ep in range(1, args.epochs+1):
         a_tgt = torch.zeros(bs, dtype=torch.long, device=DEVICE)
         for i in range(bs):
             aw = batch[i][2]; w_str = ''.join(aw)
-            if any(c in w_str for c in '？谁哪怎为'): a_tgt[i] = 0
+            if sum(ch in '{}()=#;<>' for ch in w_str) >= 2: a_tgt[i] = 20
+            elif any(c in w_str for c in '？谁哪怎为'): a_tgt[i] = 0
             elif any(c in w_str for c in '！啊哇呵'): a_tgt[i] = 12
             elif any(c in w_str for c in '不没未否'): a_tgt[i] = 13
             else: a_tgt[i] = 6
         loss_A_c = F.cross_entropy(a_logits, a_tgt)
         # loss_B: 只用非零槽位(活跃P3属性), 不用全量mean
-        attr_active_mask = (attr_b.abs().sum(dim=(0,1)) > 1e-6).float()  # [128]
+        attr_active_mask = (attr_b.abs().sum(dim=(0,1)) > 1e-6).float()[:384]
         if attr_active_mask.sum() > 0:
-            loss_B_c = torch.clamp(F.mse_loss(ct * attr_active_mask, attr_b.mean(dim=1) * attr_active_mask), max=10.0)
+            loss_B_c = torch.clamp(F.mse_loss(ct * attr_active_mask, attr_b.mean(dim=1)[:, :384] * attr_active_mask), max=10.0)
         else:
             loss_B_c = torch.tensor(0.0, device=DEVICE)
         loss_C_c = torch.clamp(F.mse_loss(ac_batch[:, :5], attr_b[:, :, 34:39].mean(dim=1)), max=10.0)
+        code_tgt = attr_b[:, :, 384:512].mean(dim=1).detach()
+        is_code_t = torch.tensor([1.0 if sum(ch in '{}()=#;<>' for ch in ''.join(batch[i][2])) >= 2 else 0.0 for i in range(bs)], device=DEVICE)
+        loss_code = torch.clamp(F.mse_loss(code_head(ct), code_tgt) + 0.5 * F.binary_cross_entropy_with_logits(is_code_head(ct).squeeze(-1), is_code_t), max=10.0)
         gate_loss = (wg_batch.std() * 10).clamp(0.01, 1.0) if wg_batch.numel() > 1 else torch.tensor(0.1, device=DEVICE)
-        sub_losses = torch.stack([gate_loss.detach(), loss_A_c.detach(), loss_B_c.detach(), loss_C_c.detach(), ce_loss.detach()])
+        sub_losses = torch.stack([gate_loss.detach(), loss_A_c.detach(), loss_B_c.detach(), loss_C_c.detach(), ce_loss.detach(), loss_code.detach()])
         temps = master_gate(sub_losses)
         # 单次CE尖峰检测: 超EMA的3倍或绝对值>5 → 触发冷却
         ce_now = ce_loss.item()
@@ -855,12 +1032,12 @@ for ep in range(1, args.epochs+1):
         p7.ce_ema = 0.90 * p7.ce_ema + 0.10 * ce_loss.item()
         p7.ce_std = 0.95 * p7.ce_std + 0.05 * abs(ce_loss.item() - p7.ce_ema)
         p7.prev_ce = ce_loss.item()
-        batch_loss = ce_loss + aux_scale*(temps[1]*loss_A_c + temps[2]*loss_B_c + temps[3]*loss_C_c) + temps[0]*gate_loss
+        batch_loss = ce_loss + aux_scale*(temps[1]*loss_A_c + temps[2]*loss_B_c + temps[3]*loss_C_c) + temps[0]*gate_loss + temps[5]*loss_code
 
-        # 自学习率: 每批更新 (暂时关闭, 用固定lr)
-        # for slr in slrs: slr.step_lr(batch_loss.item())
-        opts = [opt_p7_in, opt_p7, opt_p6, opt_p3l, opt_abc, opt_gate, opt_master]
-        # for s, o in zip(slrs, opts): s.apply(o)  # SelfLR关闭
+        # 自学习率: 每批更新 (启用! 对称±0.3% 上限3x, 不打压; 显式映射防错位)
+        opts = [opt_p7_in, opt_p7, opt_p6, opt_p3l, opt_abc, opt_gate, opt_master, opt_embed, opt_in]
+        for s, o in [(slr_p7_in,opt_p7_in),(slr_p7,opt_p7),(slr_p6,opt_p6),(slr_p3l,opt_p3l),(slr_abc,opt_abc),(slr_gate,opt_gate),(slr_master,opt_master),(slr_abc_prime,opt_abc_prime)]:
+            s.step_lr(batch_loss.item()); s.apply(o)
 
         for o in opts: o.zero_grad()
         if args.amp:
@@ -868,15 +1045,20 @@ for ep in range(1, args.epochs+1):
         else:
             batch_loss.backward()
         # NaN检测+自动回滚 (检测所有参数, 报告来源)
-        has_nan = False
-        nan_source = None
-        for m_name, module in [('char_embed', char_embed), ('p7', p7), ('p6', p6),
-                                ('p7in', p7_input_proj), ('p3l', p3l),
-                                ('abc_prime', abc_prime), ('abc_to_sent', abc_to_sent)]:
-            for p in module.parameters():
-                if p.grad is not None and torch.isnan(p.grad).any():
-                    has_nan = True; nan_source = m_name; break
-            if has_nan: break
+        _mod_list = [('char_embed', char_embed), ('p7', p7), ('p6', p6),
+                     ('p7in', p7_input_proj), ('p3l', p3l),
+                     ('abc_prime', abc_prime), ('abc_to_sent', abc_to_sent)]
+        _nf = torch.zeros((), dtype=torch.bool, device=DEVICE)
+        for _mn, _md in _mod_list:
+            for p in _md.parameters():
+                if p.grad is not None: _nf = _nf | torch.isnan(p.grad).any()
+        has_nan = bool(_nf.item()); nan_source = None
+        if has_nan:
+            for m_name, module in _mod_list:
+                for p in module.parameters():
+                    if p.grad is not None and bool(torch.isnan(p.grad).any().item()):
+                        nan_source = m_name; break
+                if nan_source: break
         if has_nan:
             w(f" [NaN]梯度异常! 来源={nan_source}, 跳过step, 从best恢复")
             ckpt_r = torch.load(os.path.join(SAVE_DIR, "V21_best.pt"), map_location=DEVICE)
@@ -904,8 +1086,6 @@ for ep in range(1, args.epochs+1):
             for o in opts: o.step()
 
         del wo_batch, sv_batch, wg_batch, Av_emb, pred_all, a_logits, ah, ct, ac_batch, attr_b
-        import gc; gc.collect()
-        torch.cuda.synchronize(); torch.cuda.empty_cache()
 
         total_loss += batch_loss.item(); total_ce += ce_loss.item()
         total_A += loss_A_c.item(); total_B += loss_B_c.item()
@@ -922,11 +1102,15 @@ for ep in range(1, args.epochs+1):
             w(f"  E{ep} [{pct:.0f}%] batch={current_bs} {gpu_str} loss={batch_loss.item():.4f} | {elapsed_ep:.0f}s ETA{eta_ep:.0f}s")
 
     elapsed = time.time()-t0; avg_loss = total_loss/max(n,1)
+    w(f"  [VRAM] peak={torch.cuda.max_memory_allocated()/2**20:.0f}MiB batch={current_bs}")
 
     if avg_loss < best_loss:
         best_loss = avg_loss
         best_epoch = ep
         try: save_best()
+        except: pass
+    if ep % 10 == 0:
+        try: save_latest(ep); w(f"  [断点] E{ep} latest 已存")
         except: pass
     if avg_loss < 0.0001:  # 收敛到底, 继续训只会炸
         w(f"  [OK] loss={avg_loss:.6f}<0.0001, 自动停训")
@@ -947,7 +1131,7 @@ for ep in range(1, args.epochs+1):
         with torch.no_grad():
             # 推理全链: P3属性+P7+P3-L+ABC+Gate+P6
             p7._loss_vec = None  # 推理前清除训练_loss_vec残留
-            A_emb = char_embed(torch.tensor(A_ids, device=DEVICE))
+            A_emb = embed_ctx(torch.tensor(A_ids, device=DEVICE).unsqueeze(0))[0]
             attr_a = words_to_attr_vec(A_w).to(DEVICE)[:len(A_w),:]
             Av_rich = torch.cat([A_emb, attr_a], dim=-1).unsqueeze(0)
             vocab = char_embed.weight.detach()
@@ -966,7 +1150,7 @@ for ep in range(1, args.epochs+1):
             # Gate用完整信号(base+ABC+sent, 训练推理一致)
             a_prob_d = a_log.softmax(-1)
             abc_conf_d = torch.stack([a_prob_d.max(-1).values.mean(),-(a_prob_d*torch.log(a_prob_d+1e-8)).sum(-1).mean(),a_log.argmax(-1).float().mean(),ac.norm(dim=-1).mean(),ac.std(dim=-1).mean(),ac.max(dim=-1).values.mean(),ct.norm(dim=-1).mean(),ct.std(dim=-1).mean(),ac[:,:5].norm(dim=-1).mean(),ac[:,5:15].norm(dim=-1).mean(),ac[:,15:].norm(dim=-1).mean(),ac.norm(dim=-1).mean()]).unsqueeze(0)
-            gate = meta(explore(torch.cat([gate_base_proj(abc_conf_d), abc_to_gate(ac), sent_to_gate(sv)], dim=-1)))
+            gate = meta(explore(torch.cat([gate_base_proj(abc_conf_d), abc_to_gate(ac), sent_to_gate(sv), torch.zeros(1, 128, device=DEVICE)], dim=-1)))
             logits = p6(sv, char_embed.weight, gate=gate)[:, :len(B_w), :]
             pred_ids = logits[0].argmax(dim=-1).tolist()
             pred = [i2c.get(i, '?') for i in pred_ids]
@@ -1046,7 +1230,7 @@ if len(aid_list) >= 2:
         w(f"  │ {gname}({s.numel()}值): mean={s.mean().item():.3f} max={s.max().item():.3f}")
 w(f"  └──────────────────────────────────")
 w(f"  ┌─ Gate状态 ───────────────────────")
-w(f"  │ explore: signal_mean={explore(torch.randn(12,device=DEVICE)).mean().item():.3f}")
+w(f"  │ explore: signal_mean={explore(torch.randn(512,device=DEVICE)).mean().item():.3f}")
 w(f"  │ meta: bias_mean={meta.bias.mean().item():.3f} bias_std={meta.bias.std().item():.3f}")
 w(f"  │ Master: temps={master_gate(torch.randn(5,device=DEVICE)).tolist()}")
 w(f"  └──────────────────────────────────")
@@ -1057,7 +1241,7 @@ if exam_set:
     A_ids, B_ids, A, B = train_set[0]
     with torch.no_grad():
         p7._loss_vec = None  # 清除训练残留
-        Av_emb = char_embed(torch.tensor(A_ids,device=DEVICE)).unsqueeze(0)
+        Av_emb = embed_ctx(torch.tensor(A_ids,device=DEVICE).unsqueeze(0))
         attr_a = words_to_attr_vec(A).to(DEVICE).unsqueeze(0)[:,:len(A),:]
         Av_rich = torch.cat([Av_emb, attr_a], dim=-1)
         wo, sv, _, _, _ = p7.forward_batch(p7_input_proj(Av_rich), vocab.unsqueeze(0), [len(A_ids)], [n_chars])
@@ -1069,12 +1253,12 @@ if exam_set:
             p3lf_v = torch.cat(feats_v) if feats_v else torch.zeros(60,device=DEVICE)
         else: p3lf_v = torch.zeros(60,device=DEVICE)
         p3lf_v = F.pad(p3lf_v,(0,max(0,128-p3lf_v.shape[0])))[:128].unsqueeze(0)
-        a_log_v, ah_v = abcA(attr_a.squeeze(0), wo[:,:attr_a.shape[1],:])
+        a_log_v, ah_v = abcA(attr_a, wo[:,:attr_a.shape[1],:])
         ct_v = abcB(ah_v, attr_a, p3lf_v)
         ac_v = abcC(ct_v, attr_a)
         a_prob_v = a_log_v.softmax(-1)
         abc_conf_v = torch.stack([a_prob_v.max(-1).values.mean(),-(a_prob_v*torch.log(a_prob_v+1e-8)).sum(-1).mean(),a_log_v.argmax(-1).float().mean(),ac_v.norm(dim=-1).mean(),ac_v.std(dim=-1).mean(),ac_v.max(dim=-1).values.mean(),ct_v.norm(dim=-1).mean(),ct_v.std(dim=-1).mean(),ac_v[:,:5].norm(dim=-1).mean(),ac_v[:,5:15].norm(dim=-1).mean(),ac_v[:,15:].norm(dim=-1).mean(),ac_v.norm(dim=-1).mean()]).unsqueeze(0)
-        gate_v = meta(explore(torch.cat([gate_base_proj(abc_conf_v), abc_to_gate(ac_v), sent_to_gate(sv)], dim=-1)))
+        gate_v = meta(explore(torch.cat([gate_base_proj(abc_conf_v), abc_to_gate(ac_v), sent_to_gate(sv), torch.zeros(1, 128, device=DEVICE)], dim=-1)))
         logits = p6(sv, char_embed.weight, gate=gate_v)[:,:len(B),:]
         preds = logits[0].argmax(-1).tolist()
         ok_train = sum(1 for i,p in enumerate(preds) if i2c.get(p,'?')==B[i])
@@ -1088,7 +1272,7 @@ if exam_set:
     for A_ids,B_ids,A,B in exam_set[:100]:
         with torch.no_grad():
             p7._loss_vec = None
-            Av_emb = char_embed(torch.tensor(A_ids,device=DEVICE)).unsqueeze(0)
+            Av_emb = embed_ctx(torch.tensor(A_ids,device=DEVICE).unsqueeze(0))
             attr_a = words_to_attr_vec(A).to(DEVICE).unsqueeze(0)[:,:len(A),:]
             Av_rich = torch.cat([Av_emb, attr_a], dim=-1)
             wo, sv, _, _, _ = p7.forward_batch(p7_input_proj(Av_rich), vocab.unsqueeze(0),
@@ -1101,12 +1285,12 @@ if exam_set:
                 p3lf_e = torch.cat(feats) if feats else torch.zeros(60,device=DEVICE)
             else: p3lf_e = torch.zeros(60,device=DEVICE)
             p3lf_e = F.pad(p3lf_e,(0,max(0,128-p3lf_e.shape[0])))[:128].unsqueeze(0)
-            a_log_e, ah_e = abcA(attr_a.squeeze(0), wo[:,:attr_a.shape[1],:])
+            a_log_e, ah_e = abcA(attr_a, wo[:,:attr_a.shape[1],:])
             ct_e = abcB(ah_e, attr_a, p3lf_e)
             ac_e = abcC(ct_e, attr_a)
             a_prob_e = a_log_e.softmax(-1)
             abc_conf_e = torch.stack([a_prob_e.max(-1).values.mean(),-(a_prob_e*torch.log(a_prob_e+1e-8)).sum(-1).mean(),a_log_e.argmax(-1).float().mean(),ac_e.norm(dim=-1).mean(),ac_e.std(dim=-1).mean(),ac_e.max(dim=-1).values.mean(),ct_e.norm(dim=-1).mean(),ct_e.std(dim=-1).mean(),ac_e[:,:5].norm(dim=-1).mean(),ac_e[:,5:15].norm(dim=-1).mean(),ac_e[:,15:].norm(dim=-1).mean(),ac_e.norm(dim=-1).mean()]).unsqueeze(0)
-            gate_e = meta(explore(torch.cat([gate_base_proj(abc_conf_e), abc_to_gate(ac_e), sent_to_gate(sv)], dim=-1)))
+            gate_e = meta(explore(torch.cat([gate_base_proj(abc_conf_e), abc_to_gate(ac_e), sent_to_gate(sv), torch.zeros(1, 128, device=DEVICE)], dim=-1)))
             logits = p6(sv, char_embed.weight, gate=gate_e)[:,:len(B),:]
             preds = logits[0].argmax(-1).tolist()
             tok += sum(1 for i,p in enumerate(preds) if i2c.get(p,'?')==B[i]); tn += len(B)
