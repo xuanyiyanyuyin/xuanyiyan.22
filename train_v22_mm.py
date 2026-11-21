@@ -801,6 +801,7 @@ total_t0 = time.time()
 scaler = torch.amp.GradScaler('cuda') if args.amp else None
 best_loss = float('inf')
 best_epoch = 0
+_cur_ep = 0
 import signal
 def save_best(sig=None, frame=None):
     path = os.path.join(SAVE_DIR, "V21_best.pt")
@@ -814,7 +815,10 @@ def save_best(sig=None, frame=None):
                 "sent_to_gate":sent_to_gate.state_dict(),
                 "c2i": c2i, "epoch": best_epoch, "loss": best_loss}, path)
     w(f"\n[保存] 最佳E{best_epoch} loss={best_loss:.4f} → {path}")
-    if sig: sys.exit(0)
+    if sig:
+        try: save_latest(_cur_ep)
+        except Exception as _se: w(f"\n[保存] latest 失败({_se!r})")
+        sys.exit(0)
 signal.signal(signal.SIGINT, save_best)
 signal.signal(signal.SIGTERM, save_best)
 
@@ -908,6 +912,7 @@ def _feed_batches(_bl):
 current_bs = BATCH_SIZE
 
 for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
+    _cur_ep = ep
     t0 = time.time(); total_loss, n = 0.0, 0
     total_ce, total_A, total_B, total_C, total_gate = 0.0, 0.0, 0.0, 0.0, 0.0
     last_temps, last_scale = None, 0.0
@@ -1168,9 +1173,8 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
         best_epoch = ep
         try: save_best()
         except: pass
-    if ep % 10 == 0:
-        try: save_latest(ep); w(f"  [断点] E{ep} latest 已存")
-        except: pass
+    try: save_latest(ep); w(f"  [断点] E{ep} latest 已存")
+    except Exception as _se: w(f"  [断点] latest 保存失败({_se!r})")
     if avg_loss < 0.0001:  # 收敛到底, 继续训只会炸
         w(f"  [OK] loss={avg_loss:.6f}<0.0001, 自动停训")
         break
