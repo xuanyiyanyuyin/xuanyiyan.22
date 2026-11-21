@@ -7,7 +7,10 @@
  16-31 关键字 one-hot [def,class,return,if,else,for,while,import,from,print,self,None,True,False,function,const]
  32-127 预留0
 """
-import torch
+try:
+    import torch
+except Exception:
+    torch = None
 
 KW = ["def", "class", "return", "if", "else", "for", "while", "import", "from", "print", "self", "None", "True", "False", "function", "const"]
 OPS = set("+-*/%=<>!&|^~")

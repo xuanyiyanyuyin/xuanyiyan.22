@@ -48,13 +48,17 @@ import faulthandler; faulthandler.dump_traceback_later(45, repeat=True)
 import concurrent.futures as _cf
 import code_worker as _cw
 _CODE_POOL = None
-if not os.environ.get("V22_NO_POOL"):
+if os.environ.get("V22_POOL") == "1":
     try:
         import multiprocessing as _mp
-        _CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(22, (os.cpu_count() or 8)), mp_context=_mp.get_context("spawn"))
+        _CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(8, (os.cpu_count() or 4)), mp_context=_mp.get_context("spawn"))
         _base_mats = list(_CODE_POOL.map(_cw.run, [(["d","e","f"," ","_","w","(",")",":"," ","p","a","s","s"], 32)]))
-    except Exception:
+        print(f"[CODE] spawn池已启用 workers={_CODE_POOL._max_workers}", flush=True)
+    except Exception as _e:
         _CODE_POOL = None
+        print(f"[CODE] spawn池不可用({_e!r}), 回落串行CPU", flush=True)
+else:
+    print("[CODE] 串行numpy编码(在CPU预取线程内, 与GPU并行)", flush=True)
 def _code_mats(words_list, L):
     if _CODE_POOL is None:
         return [p3code.code_np((w, L)) for w in words_list]
@@ -847,6 +851,60 @@ def make_batches(data, bs):
         batches.append(data_sorted[i:i+bs])
     return batches
 
+# ── CPU串行预取: GPU跑上一批时, 后台线程备下一批(属性/代码矩阵/ID), 主线程只做一次H2D ──
+import threading as _th, queue as _qu
+import numpy as np
+_pre_q = _qu.Queue(maxsize=2)
+_ATTR_NP = {}
+
+def _attr_np_table():
+    if not _ATTR_NP and attr_cache:
+        for _k, _v in attr_cache.items():
+            _ATTR_NP[_k] = _v.detach().float().cpu().numpy()
+    return _ATTR_NP
+
+def _prep_batch(batch):
+    bs = len(batch)
+    max_len_a = max(len(x[0]) for x in batch)
+    max_len_b = max(len(x[1]) for x in batch)
+    atab = _attr_np_table()
+    Av = torch.zeros(bs, max_len_a, dtype=torch.long)
+    wl = [b[2] for b in batch]
+    codes = _code_mats(wl, max_len_a)
+    attr = np.zeros((bs, max_len_a, 512), dtype=np.float32)
+    for i, (ids_a, _ib, A_words, _bw) in enumerate(batch):
+        if ids_a:
+            _na = min(len(ids_a), max_len_a)
+            Av[i, :_na] = torch.tensor(ids_a[:_na], dtype=torch.long)
+        _nn = min(len(A_words), max_len_a, MAXLEN)
+        for j in range(_nn):
+            _v = atab.get(A_words[j])
+            if _v is not None: attr[i, j, :384] = _v
+        if _nn > 0: attr[i, :_nn, 384:] = codes[i][:_nn]
+    aids = [words_to_attr_ids(x) for x in wl]
+    btgt = [[c2i.get(c, 0) for c in batch[i][3]] for i in range(bs)]
+    atgt, icode = [], []
+    for i in range(bs):
+        _s = ''.join(batch[i][2])
+        _cf = 1.0 if sum(ch in '{}()=#;<>' for ch in _s) >= 2 else 0.0
+        icode.append(_cf)
+        if _cf > 0: atgt.append(20)
+        elif any(ch in _s for ch in '？谁哪怎为'): atgt.append(0)
+        elif any(ch in _s for ch in '！啊哇呵'): atgt.append(12)
+        elif any(ch in _s for ch in '不没未否'): atgt.append(13)
+        else: atgt.append(6)
+    return {"bs": bs, "max_len_a": max_len_a, "max_len_b": max_len_b, "Av": Av,
+            "attr": attr, "aids": aids, "btgt": btgt,
+            "a_lens": [len(batch[i][0]) for i in range(bs)],
+            "atgt": torch.tensor(atgt, dtype=torch.long), "icode": torch.tensor(icode)}
+
+def _feed_batches(_bl):
+    try:
+        for _b in _bl:
+            _pre_q.put(_prep_batch(_b))
+    except Exception as _e:
+        _pre_q.put(_e)
+
 current_bs = BATCH_SIZE
 
 for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
@@ -855,37 +913,26 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
     last_temps, last_scale = None, 0.0
     p7.g_base_sum = p7.g_aux_sum = p7.g_sent_sum = p7.g_ac_sum = 0.0
     pairs_done = 0
-    remaining = train_set[:]  # 本epoch剩余数据
-    total_batches = 0
+    epoch_batches = [train_set[i:i+current_bs] for i in range(0, len(train_set), current_bs)]
+    _n_batches = len(epoch_batches)
+    _th.Thread(target=_feed_batches, args=(epoch_batches,), daemon=True).start()
 
-    while remaining:
-        batch = remaining[:current_bs]
-        remaining = remaining[current_bs:]
+    for _bi, batch in enumerate(epoch_batches):
         bs = len(batch)
         prev_loss = getattr(p7, '_loss_vec', None)
 
-        # ── 在线embedding + 批量Padding ──
-        max_len_a = max(len(x[0]) for x in batch)
-        max_len_b = max(len(x[1]) for x in batch)
+        _pf = _pre_q.get()
+        if isinstance(_pf, Exception): raise _pf
+        max_len_a = _pf["max_len_a"]
+        max_len_b = _pf["max_len_b"]
         max_attr = max_len_a
 
-        Av_batch_ids = torch.zeros(bs, max_len_a, dtype=torch.long, device=DEVICE)
-        Bv_batch_ids = torch.zeros(bs, max_len_b, dtype=torch.long, device=DEVICE)
-        for i, (ids_a, ids_b, A_words, _) in enumerate(batch):
-            Av_batch_ids[i, :len(ids_a)] = torch.tensor(ids_a, device=DEVICE)
-            Bv_batch_ids[i, :len(ids_b)] = torch.tensor(ids_b, device=DEVICE)
-
-        # ── P7: 批量 (输入升级为192D) ──
-        a_lens = [len(batch[i][0]) for i in range(bs)]
-        # P7: 词向量+P3属性拼接→p7_input_proj→128D→全词表路由
+        # ── P7: 批量 (输入升级为192D), 预取数据一次H2D ──
+        Av_batch_ids = _pf["Av"].to(DEVICE, non_blocking=True)
+        a_lens = _pf["a_lens"]
         Av_emb = embed_ctx(Av_batch_ids[:, :max_len_a])
-        attr_for_p7 = torch.zeros(bs, max_len_a, 512, device=DEVICE)  # V22: 128语言+256视觉+128代码
+        attr_for_p7 = torch.from_numpy(_pf["attr"]).to(DEVICE)  # 384语言+128代码
         _wl = [b[2] for b in batch]
-        _codes = _code_mats(_wl, max_len_a)
-        for i, A_words in enumerate(_wl):
-            _b = _base_vec(A_words)[:max_len_a]
-            _c = torch.from_numpy(_codes[i][:max_len_a]).to(DEVICE)
-            attr_for_p7[i, :_b.shape[0], :] = torch.cat([_b, _c], dim=-1)
         Av_rich = torch.cat([Av_emb, attr_for_p7], dim=-1)
         vocab = char_embed.weight.detach()
         with torch.amp.autocast('cuda', enabled=args.amp):
@@ -900,26 +947,34 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
             attr_b[:, :, 96:104] = disc_b.unsqueeze(1).expand(-1, attr_b.shape[1], -1)  # 篇章槽(非记忆)
         # P3-L: 属性联动特征
         p3lf_list = []
-        _all_ids = [words_to_attr_ids(batch[i][2]) for i in range(bs)]
-        _pl = []
-        for i in range(bs):
-            aids = _all_ids[i]
-            if len(aids) >= 2:
-                _id = torch.tensor(aids, device=DEVICE)
-                _fl = _id.float()
-                _parts = []
-                for g in range(11):
-                    m = (_id % 11) == g
-                    x = _fl[m]
-                    if x.numel() > 0:
-                        _parts.append(torch.stack([x.mean(), x.std(unbiased=False), x.max() - x.min()]))
-                    else:
-                        _parts.append(torch.zeros(3, device=DEVICE))
-                f = torch.cat(_parts)
-            else:
-                f = torch.zeros(33, device=DEVICE)
-            _pl.append(F.pad(f, (0, max(0, 128 - f.shape[0])))[:128])
-        p3lf_b = torch.stack(_pl)
+        _all_ids = _pf["aids"]
+        # 批量向量化: 11组×[mean,std,range], 全部样本一次算完 (原每样本~50个小kernel)
+        _nmax = max((len(a) for a in _all_ids), default=0)
+        if _nmax >= 2:
+            _ids_pad = torch.zeros(bs, _nmax, dtype=torch.long)
+            _lens_t = torch.tensor([len(a) for a in _all_ids], dtype=torch.long)
+            for i, a in enumerate(_all_ids):
+                if a: _ids_pad[i, :len(a)] = torch.tensor(a, dtype=torch.long)
+            _maskv = (torch.arange(_nmax).unsqueeze(0) < _lens_t.unsqueeze(1)) & (_lens_t.unsqueeze(1) >= 2)
+            _ids_pad = _ids_pad.to(DEVICE); _maskv = _maskv.to(DEVICE)
+            _fl = _ids_pad.float()
+            _parts = []
+            for g in range(11):
+                m = ((_ids_pad % 11) == g) & _maskv
+                cnt = m.sum(1, keepdim=True).clamp(min=1)
+                mean = (_fl * m).sum(1, keepdim=True) / cnt
+                var = (((_fl - mean) ** 2) * m).sum(1, keepdim=True) / cnt
+                mx = torch.where(m, _fl, torch.full_like(_fl, -1e9)).max(1, keepdim=True).values
+                mn = torch.where(m, _fl, torch.full_like(_fl, 1e9)).min(1, keepdim=True).values
+                has = m.any(1, keepdim=True)
+                mean = torch.where(has, mean, torch.zeros_like(mean))
+                std = torch.where(has, var.clamp(min=0).sqrt(), torch.zeros_like(mean))
+                rng = torch.where(has, mx - mn, torch.zeros_like(mean))
+                _parts.append(torch.cat([mean, std, rng], 1))
+            f = torch.cat(_parts, 1)  # [bs, 33]
+        else:
+            f = torch.zeros(bs, 33, device=DEVICE)
+        p3lf_b = F.pad(f, (0, 95))
         # V21.1: ABC'内容加压 → 双路径(提升ABC控制输入 + 灌入P6解码)
         abc_prime_out = abc_prime(p3lf_b)              # [bs, 128]
         code_b = attr_b[:, :, 384:512].mean(dim=1)          # 代码属性摘要(128D)
@@ -980,16 +1035,22 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
             pred_all = p6(sv_rich, char_embed.weight, gate=gates)
 
         # 主loss: cross_entropy直出字
-        ce_loss = 0.0; _ok_t = torch.zeros((), dtype=torch.long, device=DEVICE); total_pos = 0
+        _npx = pred_all.shape[1]
+        _blens = [min(len(batch[i][3]), _npx) for i in range(bs)]
+        _nBmax = max(_blens) if _blens else 0
+        assert _nBmax > 0
+        _tgt = torch.zeros(bs, _nBmax, dtype=torch.long)
         for i in range(bs):
-            nB = min(len(batch[i][1]), pred_all.shape[1])
-            b_ids = torch.tensor([c2i.get(c, 0) for c in batch[i][3][:nB]], device=DEVICE)
-            ce_loss += F.cross_entropy(pred_all[i, :nB, :], b_ids, ignore_index=0)
-            pred_ids = pred_all[i, :nB, :].argmax(dim=-1)
-            _ok_t = _ok_t + (pred_ids == b_ids).sum()
-            total_pos += nB
-        ce_loss = ce_loss / bs
-        ok_count = int(_ok_t.item())
+            _L3 = _blens[i]
+            if _L3 > 0: _tgt[i, :_L3] = torch.tensor(_pf["btgt"][i][:_L3], dtype=torch.long)
+        _tgt = _tgt.to(DEVICE)
+        _maskv2 = _tgt != 0
+        _ce_tok = F.cross_entropy(pred_all[:, :_nBmax, :].transpose(1, 2), _tgt, ignore_index=0, reduction='none')
+        _cnt2 = _maskv2.sum(1).clamp(min=1)
+        ce_loss = ((_ce_tok * _maskv2).sum(1) / _cnt2).mean()
+        _predc = pred_all[:, :_nBmax, :].argmax(dim=-1)
+        ok_count = int(((_predc == _tgt) & _maskv2).sum().item())
+        total_pos = int(_cnt2.sum().item())
         cos_val = ok_count / max(total_pos, 1)
         p7._loss_vec = F.pad(torch.tensor([cos_val, ce_loss.item()], device=DEVICE), (0, 10))
 
@@ -1004,15 +1065,8 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
             elif has_excl: a_targets[i] = 12
             elif has_neg: a_targets[i] = 13
             else: a_targets[i] = 6
-        # ABC辅助loss (P3规则监督)
-        a_tgt = torch.zeros(bs, dtype=torch.long, device=DEVICE)
-        for i in range(bs):
-            aw = batch[i][2]; w_str = ''.join(aw)
-            if sum(ch in '{}()=#;<>' for ch in w_str) >= 2: a_tgt[i] = 20
-            elif any(c in w_str for c in '？谁哪怎为'): a_tgt[i] = 0
-            elif any(c in w_str for c in '！啊哇呵'): a_tgt[i] = 12
-            elif any(c in w_str for c in '不没未否'): a_tgt[i] = 13
-            else: a_tgt[i] = 6
+        # ABC辅助loss (P3规则监督), 预取线程已算好
+        a_tgt = _pf["atgt"].to(DEVICE)
         loss_A_c = F.cross_entropy(a_logits, a_tgt)
         # loss_B: 只用非零槽位(活跃P3属性), 不用全量mean
         attr_active_mask = (attr_b.abs().sum(dim=(0,1)) > 1e-6).float()[:384]
@@ -1022,7 +1076,7 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
             loss_B_c = torch.tensor(0.0, device=DEVICE)
         loss_C_c = torch.clamp(F.mse_loss(ac_batch[:, :5], attr_b[:, :, 34:39].mean(dim=1)), max=10.0)
         code_tgt = attr_b[:, :, 384:512].mean(dim=1).detach()
-        is_code_t = torch.tensor([1.0 if sum(ch in '{}()=#;<>' for ch in ''.join(batch[i][2])) >= 2 else 0.0 for i in range(bs)], device=DEVICE)
+        is_code_t = _pf["icode"].to(DEVICE)
         loss_code = torch.clamp(F.mse_loss(code_head(ct), code_tgt) + 0.5 * F.binary_cross_entropy_with_logits(is_code_head(ct).squeeze(-1), is_code_t), max=10.0)
         gate_loss = (wg_batch.std() * 10).clamp(0.01, 1.0) if wg_batch.numel() > 1 else torch.tensor(0.1, device=DEVICE)
         sub_losses = torch.stack([gate_loss.detach(), loss_A_c.detach(), loss_B_c.detach(), loss_C_c.detach(), ce_loss.detach(), loss_code.detach()])
@@ -1096,7 +1150,7 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
         total_A += loss_A_c.item(); total_B += loss_B_c.item()
         total_C += loss_C_c.item(); total_gate += gate_loss.item()
         last_temps = temps; last_scale = aux_scale; n += 1
-        pct = (1 - len(remaining) / len(train_set)) * 100
+        pct = (_bi + 1) / _n_batches * 100
 
         if n % 100 == 0:  # 进度条
             mem = get_gpu_mem_used_mb()
