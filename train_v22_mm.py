@@ -44,7 +44,7 @@ class P6_Tied(nn.Module):
 from P3_word_attr.stack import P3AttributeStack
 from P3_word_attr.p3l_linkage import P3L_AttributeLinkage
 import p3code
-import faulthandler; faulthandler.dump_traceback_later(45, repeat=True)
+import faulthandler; faulthandler.enable()
 import concurrent.futures as _cf
 import code_worker as _cw
 _CODE_POOL = None
@@ -1188,7 +1188,7 @@ for ep in range(START_EPOCH+1, START_EPOCH+args.epochs+1):
                 pn = sum(p.norm().item() for p in mod.parameters())
                 w(f"  grad:{name}={gn:.4f} param={pn:.1f} ratio={gn/(pn+1e-8):.6f}")
 
-    if (ep<=3 or ep%args.display==0 or ep==args.epochs) and len(A_w) > 5:  # 跳过太小样本的展示
+    if (ep%args.display==0 or ep==args.epochs) and len(A_w) > 5:  # 跳过太小样本的展示
         with torch.no_grad():
             # 推理全链: P3属性+P7+P3-L+ABC+Gate+P6
             p7._loss_vec = None  # 推理前清除训练_loss_vec残留
