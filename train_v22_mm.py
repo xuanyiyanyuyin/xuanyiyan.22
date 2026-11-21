@@ -46,12 +46,19 @@ from P3_word_attr.p3l_linkage import P3L_AttributeLinkage
 import p3code
 import faulthandler; faulthandler.dump_traceback_later(45, repeat=True)
 import concurrent.futures as _cf
-_CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(32, (os.cpu_count() or 8)))
+_CODE_POOL = None
 def _code_np_worker(item):
     return p3code.code_np(item)
+if not os.environ.get("V22_NO_POOL"):
+    try:
+        _CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(32, (os.cpu_count() or 8)))
+        _base_mats = list(_CODE_POOL.map(_code_np_worker, [(["d","e","f"," ","_","w","(",")",":"," ","p","a","s","s"], 32)]))
+    except Exception:
+        _CODE_POOL = None
 def _code_mats(words_list, L):
+    if _CODE_POOL is None:
+        return [p3code.code_mat(list(w), L, "cpu").numpy().astype("float32") for w in words_list]
     return list(_CODE_POOL.map(_code_np_worker, [(w, L) for w in words_list]))
-_base_mats = _code_mats(["def _warm(): pass"], 32)  # 提前fork, 避免CUDA初始化后fork
 _ZERO384 = None
 def _base_vec(words):
     global _ZERO384
