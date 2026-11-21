@@ -46,19 +46,19 @@ from P3_word_attr.p3l_linkage import P3L_AttributeLinkage
 import p3code
 import faulthandler; faulthandler.dump_traceback_later(45, repeat=True)
 import concurrent.futures as _cf
+import code_worker as _cw
 _CODE_POOL = None
-def _code_np_worker(item):
-    return p3code.code_np(item)
 if not os.environ.get("V22_NO_POOL"):
     try:
-        _CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(32, (os.cpu_count() or 8)))
-        _base_mats = list(_CODE_POOL.map(_code_np_worker, [(["d","e","f"," ","_","w","(",")",":"," ","p","a","s","s"], 32)]))
+        import multiprocessing as _mp
+        _CODE_POOL = _cf.ProcessPoolExecutor(max_workers=min(22, (os.cpu_count() or 8)), mp_context=_mp.get_context("spawn"))
+        _base_mats = list(_CODE_POOL.map(_cw.run, [(["d","e","f"," ","_","w","(",")",":"," ","p","a","s","s"], 32)]))
     except Exception:
         _CODE_POOL = None
 def _code_mats(words_list, L):
     if _CODE_POOL is None:
-        return [p3code.code_mat(list(w), L, "cpu").numpy().astype("float32") for w in words_list]
-    return list(_CODE_POOL.map(_code_np_worker, [(w, L) for w in words_list]))
+        return [p3code.code_np((w, L)) for w in words_list]
+    return list(_CODE_POOL.map(_cw.run, [(w, L) for w in words_list]))
 _ZERO384 = None
 def _base_vec(words):
     global _ZERO384
